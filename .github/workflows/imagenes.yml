@@ -1,0 +1,102 @@
+# Construye las cinco imagenes de ChatbotX para el VPS de Novawebs.
+#
+# Por que existe: el VPS tiene 2 nucleos y ~3 GB libres. Compilar ahi un
+# monorepo pnpm+turbo de 5.600 ficheros lo tumba, y ademas la fase `deps` de
+# cada Dockerfile pide un heap de 4 GB. Aqui corre en un runner de 16 GB, en
+# amd64 nativo (el Mac es arm64, asi que cruzar por QEMU tampoco valia). El
+# VPS solo hace `docker pull`.
+#
+# El fork es publico, asi que estos minutos de Actions son gratis e ilimitados.
+name: Imágenes para el VPS
+
+on:
+  workflow_dispatch:
+    inputs:
+      etiqueta:
+        description: "Etiqueta adicional para las imágenes (opcional)"
+        required: false
+        default: ""
+  push:
+    tags: ["vps-*"]
+
+# Una tanda a la vez: cinco builds en paralelo ya saturan los runners gratuitos
+# y dos tandas simultaneas solo se pisarian la cache.
+concurrency:
+  group: imagenes-vps
+  cancel-in-progress: true
+
+env:
+  REGISTRO: ghcr.io
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: false
+      matrix:
+        app:
+          - builder             # panel web, puerto 3000
+          - worker              # colas y envio de mensajes
+          - realtime            # websockets, puerto 1999
+          - javascript-executor # sandbox de los nodos de codigo, puerto 3210
+          - mcp-server          # API por MCP, puerto 3333
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Necesario para las cache mounts de BuildKit que usan los Dockerfiles
+      # (store de pnpm y .next/cache). Sin buildx no se aprovechan.
+      - uses: docker/setup-buildx-action@v3
+
+      - uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRO }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Etiquetas
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRO }}/${{ github.repository_owner }}/chatbotx-${{ matrix.app }}
+          tags: |
+            type=raw,value=latest
+            type=raw,value=${{ inputs.etiqueta }},enable=${{ inputs.etiqueta != '' }}
+            type=sha,format=short
+            type=ref,event=tag
+
+      - name: Construir y publicar
+        uses: docker/build-push-action@v6
+        with:
+          # Contexto en la raiz: cada Dockerfile hace `turbo prune <app>` y
+          # necesita ver el monorepo entero, no la carpeta de su app.
+          context: .
+          file: apps/${{ matrix.app }}/docker/Dockerfile
+          # El VPS es amd64. No se construye arm64: doblaria el tiempo por una
+          # arquitectura que aqui no se usa.
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: false
+          # Cache de capas entre tandas, separada por app para que el builder
+          # no invalide la del worker.
+          cache-from: type=gha,scope=${{ matrix.app }}
+          cache-to: type=gha,mode=max,scope=${{ matrix.app }}
+
+  resumen:
+    needs: construir
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Que hacer con esto
+        run: |
+          echo "### Imagenes publicadas" >> "$GITHUB_STEP_SUMMARY"
+          echo "" >> "$GITHUB_STEP_SUMMARY"
+          for a in builder worker realtime javascript-executor mcp-server; do
+            echo "- ghcr.io/${{ github.repository_owner }}/chatbotx-$a:latest" >> "$GITHUB_STEP_SUMMARY"
+          done
