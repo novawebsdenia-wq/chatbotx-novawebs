@@ -1283,7 +1283,8 @@
       "placeholder": "587"
     },
     "provider": {
-      "label": "Penyedia"
+      "label": "Penyedia",
+      "placeholder": "Pilih penyedia"
     },
     "prompt": {
       "label": "Prompt",
@@ -3796,7 +3797,8 @@
     "at": "Pada"
   },
   "errorLogs": {
-    "title": "Log Kesalahan"
+    "title": "Log Kesalahan",
+    "unknownContact": "Kontak tidak dikenal"
   },
   "developerAccessToken": {
     "title": "Token Akses API",

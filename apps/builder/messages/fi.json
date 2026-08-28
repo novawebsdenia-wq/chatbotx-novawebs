@@ -1283,7 +1283,8 @@
       "placeholder": "587"
     },
     "provider": {
-      "label": "Palveluntarjoaja"
+      "label": "Palveluntarjoaja",
+      "placeholder": "Valitse palveluntarjoaja"
     },
     "prompt": {
       "label": "Kehote",
@@ -3796,7 +3797,8 @@
     "at": "Klo"
   },
   "errorLogs": {
-    "title": "Virhelokit"
+    "title": "Virhelokit",
+    "unknownContact": "Tuntematon yhteystieto"
   },
   "developerAccessToken": {
     "title": "API-käyttöoikeustunnus",

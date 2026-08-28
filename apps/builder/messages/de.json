@@ -1283,7 +1283,8 @@
       "placeholder": "587"
     },
     "provider": {
-      "label": "Anbieter"
+      "label": "Anbieter",
+      "placeholder": "Anbieter auswählen"
     },
     "prompt": {
       "label": "Prompt",
@@ -3796,7 +3797,8 @@
     "at": "Um"
   },
   "errorLogs": {
-    "title": "Fehlerprotokolle"
+    "title": "Fehlerprotokolle",
+    "unknownContact": "Unbekannter Kontakt"
   },
   "developerAccessToken": {
     "title": "API-Zugriffstoken",

@@ -1283,7 +1283,8 @@
       "placeholder": "587"
     },
     "provider": {
-      "label": "Fornecedor"
+      "label": "Fornecedor",
+      "placeholder": "Selecionar fornecedor"
     },
     "prompt": {
       "label": "Prompt",
@@ -3792,7 +3793,8 @@
     "at": "Às"
   },
   "errorLogs": {
-    "title": "Registos de erros"
+    "title": "Registos de erros",
+    "unknownContact": "Contacto desconhecido"
   },
   "developerAccessToken": {
     "title": "Token de acesso à API",

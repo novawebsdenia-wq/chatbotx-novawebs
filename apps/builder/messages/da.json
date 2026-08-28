@@ -1283,7 +1283,8 @@
       "placeholder": "587"
     },
     "provider": {
-      "label": "Udbyder"
+      "label": "Udbyder",
+      "placeholder": "Vælg udbyder"
     },
     "prompt": {
       "label": "Prompt",
@@ -3796,7 +3797,8 @@
     "at": "På"
   },
   "errorLogs": {
-    "title": "Fejl Logfiler"
+    "title": "Fejl Logfiler",
+    "unknownContact": "Ukendt kontakt"
   },
   "developerAccessToken": {
     "title": "API Access Token",

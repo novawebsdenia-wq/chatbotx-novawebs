@@ -1283,7 +1283,8 @@
       "placeholder": "587"
     },
     "provider": {
-      "label": "プロバイダー"
+      "label": "プロバイダー",
+      "placeholder": "プロバイダーを選択"
     },
     "prompt": {
       "label": "プロンプト",
@@ -3775,7 +3776,8 @@
     "at": "時刻"
   },
   "errorLogs": {
-    "title": "エラーログ"
+    "title": "エラーログ",
+    "unknownContact": "不明な連絡先"
   },
   "developerAccessToken": {
     "title": "APIアクセストークン",

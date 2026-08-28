@@ -971,7 +971,8 @@
     "title": "E-postämnen"
   },
   "errorLogs": {
-    "title": "Felloggar"
+    "title": "Felloggar",
+    "unknownContact": "Okänd kontakt"
   },
   "extensionsMe": {
     "actions": {
@@ -2284,7 +2285,8 @@
       "placeholder": "Ange prompt"
     },
     "provider": {
-      "label": "Leverantör"
+      "label": "Leverantör",
+      "placeholder": "Välj leverantör"
     },
     "publishableKey": {
       "label": "Publicerbar nyckel"

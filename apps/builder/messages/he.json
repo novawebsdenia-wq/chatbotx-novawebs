@@ -2024,7 +2024,8 @@
     "at": "בשעה"
   },
   "errorLogs": {
-    "title": "יומני שגיאות"
+    "title": "יומני שגיאות",
+    "unknownContact": "איש קשר לא ידוע"
   },
   "developerAccessToken": {
     "title": "אסימון גישה ל-API",
@@ -3880,7 +3881,8 @@
       "placeholder": "587"
     },
     "provider": {
-      "label": "ספק"
+      "label": "ספק",
+      "placeholder": "בחר ספק"
     },
     "prompt": {
       "label": "הנחיה",
