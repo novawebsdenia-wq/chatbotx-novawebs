@@ -6,6 +6,7 @@ import {
 import {
   getInstagramAccountInsights,
   getInstagramAccountOverview,
+  getInstagramMediaInsights,
   type InstagramAuthValue,
   listInstagramMediaEngagement,
 } from "@chatbotx.io/integration-instagram"
@@ -113,6 +114,23 @@ export async function instagramOverview(
   const recientes = medios.filter(
     (m) => new Date(m.timestamp).getTime() >= desde,
   )
+
+  // Guardados y compartidos NO existen a nivel de cuenta: Meta solo los da por
+  // publicacion, asi que el total de la semana hay que sumarlo. Una publicacion
+  // demasiado antigua o de un tipo sin soporte devuelve error, y cuenta como
+  // ceros para que no tumbe el resumen entero.
+  const porPublicacion = await Promise.all(
+    recientes.map((m) =>
+      getInstagramMediaInsights({ auth, mediaId: m.id }).catch(() => ({
+        saved: 0,
+        shares: 0,
+        reach: 0,
+        views: 0,
+      })),
+    ),
+  )
+  const sumaInsights = (campo: "saved" | "shares" | "reach" | "views") =>
+    porPublicacion.reduce((n, p) => n + p[campo], 0)
   const suma = (leer: (m: (typeof recientes)[number]) => number) =>
     recientes.reduce((n, m) => n + leer(m), 0)
 
@@ -130,15 +148,21 @@ export async function instagramOverview(
       insightsAvailable: insights !== null,
       totals: {
         posts: cuenta.media_count ?? recientes.length,
-        views: insights?.views ?? 0,
-        reach: insights?.reach ?? 0,
+        // `||` y no `??` a proposito: la metrica de cuenta llega a 0 cuando
+        // ese periodo no la tiene, y `??` conservaria ese 0 en vez de caer a
+        // la suma por publicacion, que si tiene dato. El alcance de cuenta se
+        // prefiere cuando existe porque va deduplicado por persona; sumarlo
+        // por publicacion cuenta dos veces a quien vio varias.
+        views: insights?.views || sumaInsights("views"),
+        reach: insights?.reach || sumaInsights("reach"),
         likes,
         comments,
-        saved: 0,
-        shares: 0,
-        interactions: likes + comments,
+        saved: sumaInsights("saved"),
+        shares: sumaInsights("shares"),
+        interactions:
+          likes + comments + sumaInsights("saved") + sumaInsights("shares"),
       },
-      posts: recientes.map((m) => ({
+      posts: recientes.map((m, i) => ({
         id: m.id,
         caption: m.caption ?? "",
         permalink: m.permalink ?? "",
@@ -146,12 +170,12 @@ export async function instagramOverview(
         thumbnailUrl: m.thumbnail_url ?? m.media_url ?? null,
         mediaType: m.media_type ?? "",
         timestamp: m.timestamp,
-        views: null,
-        reach: null,
+        views: porPublicacion[i].views,
+        reach: porPublicacion[i].reach,
         likes: m.like_count ?? null,
         comments: m.comments_count ?? null,
-        saved: null,
-        shares: null,
+        saved: porPublicacion[i].saved,
+        shares: porPublicacion[i].shares,
       })),
     },
   }

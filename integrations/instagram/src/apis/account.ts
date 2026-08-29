@@ -133,3 +133,50 @@ export const getInstagramAccountInsights = (props: {
     }
   })
 }
+
+export type InstagramMediaInsights = {
+  saved: number
+  shares: number
+  reach: number
+  views: number
+}
+
+/**
+ * Los insights de UNA publicacion: guardados, compartidos, alcance y vistas.
+ *
+ * Van por publicacion y no por cuenta porque Meta no agrega guardados ni
+ * compartidos a nivel de perfil: `/me/insights` no los tiene, solo
+ * `/{media-id}/insights`. Sumarlos aqui es la unica forma de tener el total
+ * de la semana.
+ *
+ * Necesita `instagram_business_manage_insights`. Una publicacion demasiado
+ * antigua o de un tipo sin soporte devuelve error; quien llama lo trata como
+ * ceros y sigue, porque una publicacion rara no debe tumbar el resumen.
+ */
+export const getInstagramMediaInsights = (props: {
+  auth: InstagramAuthValue
+  mediaId: string
+}): Promise<InstagramMediaInsights> => {
+  const { auth, mediaId } = props
+  const version = auth.metadata.version ?? DEFAULT_API_VERSION
+  const endpoint = `${version}/${mediaId}/insights`
+
+  return rescue(endpoint, async () => {
+    const res = await instagramBusinessClient.get<{
+      data: { name: string; values?: { value: number }[] }[]
+    }>(endpoint, {
+      headers: { Authorization: `Bearer ${auth.tokens.accessToken}` },
+      searchParams: { metric: "saved,shares,reach,views" },
+    })
+
+    const valor = (nombre: string) =>
+      res.data.find((m) => m.name === nombre)?.values?.[0]?.value ?? 0
+
+    return {
+      saved: valor("saved"),
+      shares: valor("shares"),
+      reach: valor("reach"),
+      views: valor("views"),
+    }
+  })
+}
