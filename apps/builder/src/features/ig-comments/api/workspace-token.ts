@@ -107,11 +107,9 @@ const deleteIgCommentWorkspaceTokenAPI = workspaceTokenAuthAPI
     await deleteIgComment({ workspaceId: context.workspace.id, id: input.id })
   })
 
-const igCommentsWorkspaceTokenAPIs = {
+export const igCommentsWorkspaceTokenAPIs = {
   listIgCommentsWorkspaceTokenAPI,
   createIgCommentWorkspaceTokenAPI,
   updateIgCommentWorkspaceTokenAPI,
   deleteIgCommentWorkspaceTokenAPI,
 }
-
-export default igCommentsWorkspaceTokenAPIs

@@ -8,7 +8,7 @@ import conversationWorkspaceTokenAPIs from "@/features/conversations/api/workspa
 import customFieldWorkspaceTokenAPIs from "@/features/custom-fields/api/workspace-token"
 import errorLogWorkspaceTokenAPIs from "@/features/error-logs/api/workspace-token"
 import flowWorkspaceTokenAPIs from "@/features/flows/api/workspace-token"
-import igCommentsWorkspaceTokenAPIs from "@/features/ig-comments/api/workspace-token"
+import { igCommentsWorkspaceTokenAPIs } from "@/features/ig-comments/api/workspace-token"
 import inboxWorkspaceTokenAPIs from "@/features/inboxes/api/workspace-token"
 import { channelApiAPIs } from "@/features/integration-api/api"
 import whatsappMessageTemplateWorkspaceTokenAPIs from "@/features/integration-whatsapp/message-templates/api/workspace-token"
