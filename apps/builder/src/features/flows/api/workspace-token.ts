@@ -12,6 +12,7 @@ import { updateDraftFlowVersion } from "../actions/update-draft-flow-version-act
 import {
   findDraftFlowVersionId,
   findFlowForWorkspace,
+  flowFunnelStats,
   listFlows,
 } from "../queries"
 import {
@@ -119,6 +120,34 @@ const flowWorkspaceTokenAPIs = {
     .handler(
       async ({ context, input }) =>
         await findFlowForWorkspace(context.workspace.id, input.id),
+    ),
+  // Cuanta gente distinta llego a cada nodo y cuantos pulsaron cada boton: el
+  // embudo real de la campana. ChatbotX no acorta enlaces, asi que la tasa de
+  // pulsacion del boton es la medida honesta que sustituye al CTR.
+  getFlowStatsWorkspaceTokenAPI: workspaceTokenAuthAPI
+    .route({
+      method: "GET",
+      path: "/v1/flows/{id}/stats",
+      summary: "Per-node and per-button funnel counts of a flow",
+      tags: ["Flows"],
+    })
+    .input(z.object({ id: zodBigintAsString() }))
+    .output(
+      z.object({
+        data: z.object({
+          nodes: z.array(
+            z.object({ nodeId: z.string(), contacts: z.number() }),
+          ),
+          buttons: z.array(
+            z.object({ buttonId: z.string(), contacts: z.number() }),
+          ),
+        }),
+      }),
+    )
+    .errors(possibleErrorsOnFindingResource)
+    .handler(
+      async ({ context, input }) =>
+        await flowFunnelStats(context.workspace.id, input.id),
     ),
 }
 
