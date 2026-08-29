@@ -28,7 +28,12 @@ import { deleteIgComment } from "../actions/delete-ig-comment.action"
 import { updateIgComment } from "../actions/update-ig-comment.action"
 import { listIgCommentsForWorkspace } from "../queries"
 import {
+  listInstagramFacebookMedia,
+  listInstagramLoginMedia,
+} from "../queries/instagram-media"
+import {
   createIgCommentRequest,
+  igCommentVariants,
   listIgCommentsResponse,
   updateIgCommentRequest,
 } from "../schema/action"
@@ -110,9 +115,51 @@ const deleteIgCommentWorkspaceTokenAPI = workspaceTokenAuthAPI
     await deleteIgComment({ workspaceId: context.workspace.id, id: input.id })
   })
 
+/**
+ * Las publicaciones de Instagram, para elegir el disparador de una campana.
+ *
+ * `authenticated.ts` ya las expone, pero pidiendo el `workspaceId` por la ruta
+ * y con `workspaceAuthorizedMidddleware`, que un token de espacio no satisface.
+ * El token ya identifica el espacio, asi que aqui sale de `context`.
+ *
+ * El token de la Graph API se queda en ChatbotX: quien llama solo recibe la
+ * lista, no la credencial.
+ */
+const listInstagramMediaWorkspaceTokenAPI = workspaceTokenAuthAPI
+  .route({
+    method: "GET",
+    path: "/v1/ig-comments/instagram-media",
+    summary: "List Instagram media for comment automations",
+    tags: ["IG Comments"],
+  })
+  .input(z.object({ variant: igCommentVariants.default("instagram") }))
+  .output(
+    z.object({
+      posts: z.array(
+        z.object({
+          id: z.string(),
+          message: z.string().optional(),
+          full_picture: z.string().optional(),
+          created_time: z.string(),
+          permalink_url: z.string().optional(),
+          media_product_type: z.string().optional(),
+          accountId: z.string(),
+        }),
+      ),
+      pages: z.array(z.object({ id: z.string(), name: z.string() })),
+    }),
+  )
+  .errors(possibleErrorsOnFindingResource)
+  .handler(async ({ context, input }) =>
+    input.variant === "instagram"
+      ? await listInstagramLoginMedia(context.workspace.id)
+      : await listInstagramFacebookMedia(context.workspace.id),
+  )
+
 export const igCommentsWorkspaceTokenAPIs = {
   listIgCommentsWorkspaceTokenAPI,
   createIgCommentWorkspaceTokenAPI,
   updateIgCommentWorkspaceTokenAPI,
   deleteIgCommentWorkspaceTokenAPI,
+  listInstagramMediaWorkspaceTokenAPI,
 }
