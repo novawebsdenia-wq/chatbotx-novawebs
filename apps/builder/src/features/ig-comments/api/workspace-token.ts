@@ -26,7 +26,7 @@ import { workspaceTokenAuthAPI } from "@/orpc"
 import { createIgComment } from "../actions/create-ig-comment.action"
 import { deleteIgComment } from "../actions/delete-ig-comment.action"
 import { updateIgComment } from "../actions/update-ig-comment.action"
-import { listIgComments } from "../queries"
+import { listIgCommentsForWorkspace } from "../queries"
 import {
   createIgCommentRequest,
   listIgCommentsResponse,
@@ -56,7 +56,10 @@ const listIgCommentsWorkspaceTokenAPI = workspaceTokenAuthAPI
   .errors(possibleErrorsOnFindingResource)
   .handler(
     async ({ context, input }) =>
-      await listIgComments({ ...input, workspaceId: context.workspace.id }),
+      await listIgCommentsForWorkspace({
+        ...input,
+        workspaceId: context.workspace.id,
+      }),
   )
 
 const createIgCommentWorkspaceTokenAPI = workspaceTokenAuthAPI

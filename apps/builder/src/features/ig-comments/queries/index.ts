@@ -20,6 +20,21 @@ export async function listIgComments(
 ): Promise<ListIgCommentsResponse> {
   await assertCurrentUserCanAccessChatbot(input.workspaceId)
 
+  return await listIgCommentsForWorkspace(input)
+}
+
+/**
+ * The query itself, without the session check.
+ *
+ * Split out so the workspace-token API can reuse it: a token is already scoped
+ * to one workspace, so `assertCurrentUserCanAccessChatbot` — which resolves a
+ * browser session — would always fail there even though the caller is properly
+ * authorized. Callers on the session path must keep going through
+ * `listIgComments` above; this one authorizes nothing on its own.
+ */
+export async function listIgCommentsForWorkspace(
+  input: ListIgCommentsRequest,
+): Promise<ListIgCommentsResponse> {
   // No folderId in the URL means the root view, which must scope to unfiled
   // automations only — treating it the same as "not filtered at all" (the
   // previous behaviour) surfaced every automation regardless of which folder
