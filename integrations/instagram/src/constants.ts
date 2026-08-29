@@ -10,4 +10,8 @@ export const INSTAGRAM_BUSINESS_SCOPES = [
   "instagram_business_basic",
   "instagram_business_manage_messages",
   "instagram_business_manage_comments",
+  // Alcance, visualizaciones y seguidores por dia. Una conexion anterior a
+  // este permiso sigue funcionando: las estadisticas llegan vacias y la
+  // pantalla lo dice, hasta que se vuelva a autorizar la cuenta.
+  "instagram_business_manage_insights",
 ]
