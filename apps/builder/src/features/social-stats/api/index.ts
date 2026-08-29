@@ -90,12 +90,13 @@ const tiktokOverviewWorkspaceTokenAPI = workspaceTokenAuthAPI
     summary: "Follower and engagement counters of the TikTok account",
     tags: ["Social Stats"],
   })
-  // `days` se acepta por simetria con las otras dos, pero TikTok solo devuelve
-  // contadores de cuenta: no hay ventana que aplicar.
   .input(entrada)
   .output(salida)
   .errors(possibleErrorsOnFindingResource)
-  .handler(async ({ context }) => await tiktokOverview(context.workspace.id))
+  .handler(
+    async ({ context, input }) =>
+      await tiktokOverview(context.workspace.id, input.days),
+  )
 
 export const socialStatsAPI = {
   instagramOverviewWorkspaceTokenAPI,

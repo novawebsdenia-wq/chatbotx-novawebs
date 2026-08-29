@@ -191,6 +191,10 @@ export const MESSENGER_SCOPES = [
   "pages_messaging",
   "pages_show_list",
   "business_management",
+  // Alcance e impresiones de la pagina (`/{page-id}/insights`). Una conexion
+  // anterior a este permiso sigue funcionando: la llamada a insights falla y
+  // el resumen se queda sin esos dos, hasta que se reconecte la pagina.
+  "read_insights",
 ]
 
 /**

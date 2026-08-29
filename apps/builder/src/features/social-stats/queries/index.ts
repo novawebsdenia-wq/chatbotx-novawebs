@@ -11,12 +11,14 @@ import {
   listInstagramMediaEngagement,
 } from "@chatbotx.io/integration-instagram"
 import {
+  getFacebookPageInsights,
   getFacebookPageOverview,
   listFacebookPagePosts,
   type MessengerAuthValue,
 } from "@chatbotx.io/integration-messenger"
 import {
   getUserStats,
+  listVideos,
   type TiktokAuthValue,
 } from "@chatbotx.io/integration-tiktok"
 
@@ -208,9 +210,10 @@ export async function facebookOverview(
   const auth = integration.auth as MessengerAuthValue
   const desde = Date.now() - days * 86_400_000
 
-  const [pagina, posts] = await Promise.all([
+  const [pagina, posts, insights] = await Promise.all([
     getFacebookPageOverview({ auth }),
     listFacebookPagePosts({ auth }),
+    getFacebookPageInsights({ auth, days }).catch(() => null),
   ])
 
   const recientes = posts.filter(
@@ -224,6 +227,8 @@ export async function facebookOverview(
     (n, p) => n + (p.comments?.summary?.total_count ?? 0),
     0,
   )
+  // `shares` no viene cuando la publicacion no tiene ninguna comparticion.
+  const shares = recientes.reduce((n, p) => n + (p.shares?.count ?? 0), 0)
 
   return {
     data: {
@@ -233,16 +238,17 @@ export async function facebookOverview(
       },
       followers: pagina.followers_count ?? pagina.fan_count ?? 0,
       followerHistory: [],
-      insightsAvailable: false,
+      insightsAvailable: insights !== null,
       totals: {
         posts: posts.length,
-        views: 0,
-        reach: 0,
+        views: insights?.impressions ?? 0,
+        reach: insights?.reach ?? 0,
         likes,
         comments,
+        // Facebook no expone «guardados» de una publicacion de pagina.
         saved: 0,
-        shares: 0,
-        interactions: likes + comments,
+        shares,
+        interactions: likes + comments + shares,
       },
       posts: recientes.map((p) => ({
         id: p.id,
@@ -256,7 +262,7 @@ export async function facebookOverview(
         likes: p.likes?.summary?.total_count ?? null,
         comments: p.comments?.summary?.total_count ?? null,
         saved: null,
-        shares: null,
+        shares: p.shares?.count ?? null,
       })),
     },
   }
@@ -277,6 +283,7 @@ export async function facebookOverview(
  */
 export async function tiktokOverview(
   workspaceId: string,
+  days: number,
 ): Promise<{ data: InstagramOverview }> {
   const integrations = await tiktokIntegrationService.findAllByWorkspaceIds([
     workspaceId,
@@ -287,7 +294,23 @@ export async function tiktokOverview(
   }
 
   const auth = integration.auth as TiktokAuthValue
-  const cuenta = await getUserStats({ accessToken: auth.tokens.accessToken })
+  const accessToken = auth.tokens.accessToken
+  const desde = Date.now() - days * 86_400_000
+
+  // `video.list` puede no estar concedido en una conexion anterior a el; sin
+  // videos el resumen se queda en los contadores de cuenta en vez de fallar.
+  const [cuenta, videos] = await Promise.all([
+    getUserStats({ accessToken }),
+    listVideos({ accessToken }).catch(() => []),
+  ])
+
+  // `create_time` viene en segundos, no en milisegundos.
+  const recientes = videos.filter((v) => v.create_time * 1000 >= desde)
+  const suma = (leer: (v: (typeof recientes)[number]) => number) =>
+    recientes.reduce((n, v) => n + leer(v), 0)
+
+  const comments = suma((v) => v.comment_count ?? 0)
+  const shares = suma((v) => v.share_count ?? 0)
 
   return {
     data: {
@@ -302,15 +325,32 @@ export async function tiktokOverview(
       insightsAvailable: false,
       totals: {
         posts: cuenta.video_count ?? 0,
-        views: 0,
+        views: suma((v) => v.view_count ?? 0),
         reach: 0,
+        // Los me gusta son el TOTAL historico de la cuenta, no los de la
+        // ventana: es lo unico que da `user/info/`. Los de los videos
+        // recientes van en cada entrada de `posts`.
         likes: cuenta.likes_count ?? 0,
-        comments: 0,
+        comments,
+        // TikTok no expone los guardados de un video en ninguna forma.
         saved: 0,
-        shares: 0,
-        interactions: cuenta.likes_count ?? 0,
+        shares,
+        interactions: (cuenta.likes_count ?? 0) + comments + shares,
       },
-      posts: [],
+      posts: recientes.map((v) => ({
+        id: v.id,
+        caption: v.title ?? "",
+        permalink: v.share_url ?? "",
+        thumbnailUrl: v.cover_image_url ?? null,
+        mediaType: "VIDEO",
+        timestamp: new Date(v.create_time * 1000).toISOString(),
+        views: v.view_count ?? null,
+        reach: null,
+        likes: v.like_count ?? null,
+        comments: v.comment_count ?? null,
+        saved: null,
+        shares: v.share_count ?? null,
+      })),
     },
   }
 }

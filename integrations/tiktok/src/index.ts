@@ -1,5 +1,6 @@
 export { generateAuthUrl } from "./apis/auth"
 export { getUserStats, type TiktokUserStats } from "./apis/user"
+export { listVideos, type TiktokVideo } from "./apis/video"
 export { subscribeWebhook } from "./apis/webhook"
 export * from "./integration"
 export { isRevokedTokenError, mapToChannelError } from "./lib/error-mapper"
