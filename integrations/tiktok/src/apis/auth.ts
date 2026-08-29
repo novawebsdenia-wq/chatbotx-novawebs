@@ -9,15 +9,29 @@ const TIKTOK_AUTH_BASE_URL = "https://www.tiktok.com/v2/auth/authorize/"
 const TIKTOK_TOKEN_URL = `${BUSINESS_API_BASE_URL}tt_user/oauth2/token/`
 const TIKTOK_REFRESH_URL = `${BUSINESS_API_BASE_URL}tt_user/oauth2/refresh_token/`
 
+/**
+ * Los scopes de la conexion, con la mensajeria detras de una variable.
+ *
+ * `message.list.*` son de Business Messaging: TikTok solo los concede a una
+ * app aprobada, y en Sandbox no existen. Como un scope invalido tumba TODO el
+ * OAuth (no solo esa parte), pedirlos con la app sin aprobar impide incluso
+ * conectar para leer estadisticas, que si funcionan en Sandbox con
+ * `user.info.stats`.
+ *
+ * Por eso van aparte: con la app aprobada se ponen a `true` y vuelven, sin
+ * tocar codigo.
+ */
+const TIKTOK_MESSAGING_ENABLED = process.env.TIKTOK_MESSAGING === "true"
+
 const TIKTOK_SCOPES = [
   "user.info.basic",
   "user.info.username",
   "user.info.profile",
   "user.info.stats",
   "user.account.type",
-  "message.list.read",
-  "message.list.send",
-  "message.list.manage",
+  ...(TIKTOK_MESSAGING_ENABLED
+    ? ["message.list.read", "message.list.send", "message.list.manage"]
+    : []),
 ].join(",")
 
 export function generateAuthUrl({
