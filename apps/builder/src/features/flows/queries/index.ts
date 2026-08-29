@@ -1,7 +1,7 @@
 import { notFoundException } from "@chatbotx.io/business/errors"
 import { db, relationsFilterToSQL } from "@chatbotx.io/database/client"
 import { rootFolderId } from "@chatbotx.io/database/partials"
-import { flowModel, flowVersionModel } from "@chatbotx.io/database/schema"
+import { flowModel } from "@chatbotx.io/database/schema"
 import {
   likeContains,
   parseOrderByAsObject,
