@@ -1,10 +1,18 @@
-import { instagramIntegrationService } from "@chatbotx.io/business"
+import {
+  instagramIntegrationService,
+  messengerIntegrationService,
+} from "@chatbotx.io/business"
 import {
   getInstagramAccountInsights,
   getInstagramAccountOverview,
   type InstagramAuthValue,
   listInstagramMediaEngagement,
 } from "@chatbotx.io/integration-instagram"
+import {
+  getFacebookPageOverview,
+  listFacebookPagePosts,
+  type MessengerAuthValue,
+} from "@chatbotx.io/integration-messenger"
 
 export type InstagramOverview = {
   account: { username: string; avatar: string | null } | null
@@ -137,6 +145,88 @@ export async function instagramOverview(
         reach: null,
         likes: m.like_count ?? null,
         comments: m.comments_count ?? null,
+        saved: null,
+        shares: null,
+      })),
+    },
+  }
+}
+
+/**
+ * El resumen de la pagina de Facebook conectada.
+ *
+ * Misma forma que el de Instagram para que la pantalla no tenga que
+ * distinguir: lo unico que cambia es de donde salen los numeros.
+ *
+ * `insightsAvailable` va siempre en falso: alcance e impresiones de pagina
+ * viven en `/{page-id}/insights` y piden `read_insights`, que la conexion de
+ * Messenger no solicita. Lo que si llega es real — seguidores y la suma de
+ * me gusta y comentarios de las publicaciones.
+ *
+ * Autoriza nada: quien llama ya debe haber probado que puede leer el espacio.
+ */
+export async function facebookOverview(
+  workspaceId: string,
+  days: number,
+): Promise<{ data: InstagramOverview }> {
+  const integrations = await messengerIntegrationService.findByWorkspaceId(
+    workspaceId,
+  )
+  const integration = integrations[0]
+  if (!integration) {
+    return { data: VACIO }
+  }
+
+  const auth = integration.auth as MessengerAuthValue
+  const desde = Date.now() - days * 86_400_000
+
+  const [pagina, posts] = await Promise.all([
+    getFacebookPageOverview({ auth }),
+    listFacebookPagePosts({ auth }),
+  ])
+
+  const recientes = posts.filter(
+    (p) => new Date(p.created_time).getTime() >= desde,
+  )
+  const likes = recientes.reduce(
+    (n, p) => n + (p.likes?.summary?.total_count ?? 0),
+    0,
+  )
+  const comments = recientes.reduce(
+    (n, p) => n + (p.comments?.summary?.total_count ?? 0),
+    0,
+  )
+
+  return {
+    data: {
+      account: {
+        username: pagina.name ?? integration.name ?? "",
+        avatar: pagina.picture?.data?.url ?? null,
+      },
+      followers: pagina.followers_count ?? pagina.fan_count ?? 0,
+      followerHistory: [],
+      insightsAvailable: false,
+      totals: {
+        posts: posts.length,
+        views: 0,
+        reach: 0,
+        likes,
+        comments,
+        saved: 0,
+        shares: 0,
+        interactions: likes + comments,
+      },
+      posts: recientes.map((p) => ({
+        id: p.id,
+        caption: p.message ?? "",
+        permalink: p.permalink_url ?? "",
+        thumbnailUrl: p.full_picture ?? null,
+        mediaType: "",
+        timestamp: p.created_time,
+        views: null,
+        reach: null,
+        likes: p.likes?.summary?.total_count ?? null,
+        comments: p.comments?.summary?.total_count ?? null,
         saved: null,
         shares: null,
       })),
