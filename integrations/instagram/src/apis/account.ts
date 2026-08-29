@@ -97,7 +97,7 @@ export const getInstagramAccountInsights = (props: {
   const { auth, days } = props
   const version = auth.metadata.version ?? DEFAULT_API_VERSION
   const endpoint = `${version}/me/insights`
-  const since = Math.floor((Date.now() - days * 86400000) / 1000)
+  const since = Math.floor((Date.now() - days * 86_400_000) / 1000)
   const until = Math.floor(Date.now() / 1000)
 
   return rescue(endpoint, async () => {
