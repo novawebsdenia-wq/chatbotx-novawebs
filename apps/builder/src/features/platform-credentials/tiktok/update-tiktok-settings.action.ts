@@ -6,6 +6,7 @@ import {
   tiktokCredentialUpdateSchema,
 } from "@chatbotx.io/database/partials"
 import { subscribeWebhook } from "@chatbotx.io/integration-tiktok"
+import { logger } from "@/lib/log"
 import { getBrokerOrigin } from "@/lib/oauth-broker"
 import { resolveTenantProviderOrigin } from "@/lib/provider-origin"
 import { authActionClient } from "@/lib/safe-action"
@@ -28,14 +29,27 @@ export const updateTiktokSettingAction = authActionClient
       ? await resolveTenantProviderOrigin(scopedUserId)
       : getBrokerOrigin()
 
-    await subscribeWebhook(
-      { clientId: config.clientId, clientSecret: config.clientSecret },
-      new URL("/integrations/tiktok/webhook", webhookOrigin).toString(),
-    )
-
+    // El webhook es para los mensajes directos, y su registro puede fallar por
+    // motivos que nada tienen que ver con la credencial: en Sandbox no se
+    // sirve, y una app sin el producto de webhooks lo rechaza. Iba antes del
+    // upsert y sin capturar, asi que ese fallo impedia guardar las claves y el
+    // formulario parecia no aceptarlas. Guardar primero y avisar despues deja
+    // la conexion utilizable para lo que si funciona (leer estadisticas).
     await platformCredentialService.upsert({
       userId: scopedUserId,
       type: "tiktok",
       config,
     })
+
+    try {
+      await subscribeWebhook(
+        { clientId: config.clientId, clientSecret: config.clientSecret },
+        new URL("/integrations/tiktok/webhook", webhookOrigin).toString(),
+      )
+    } catch (error) {
+      logger.warn(
+        { err: error, webhookOrigin },
+        "[updateTiktokSettingAction] webhook subscription failed; credentials saved anyway",
+      )
+    }
   })
