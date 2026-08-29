@@ -268,7 +268,9 @@ export async function tiktokOverview(
   return {
     data: {
       account: {
-        username: cuenta.username ?? integration.name ?? "",
+        // `findAllByWorkspaceIds` proyecta solo id, workspaceId y auth: el
+        // nombre de la cuenta esta en los metadatos del propio token.
+        username: cuenta.username ?? auth.metadata.username ?? "",
         avatar: cuenta.avatar_url ?? null,
       },
       followers: cuenta.follower_count ?? 0,
