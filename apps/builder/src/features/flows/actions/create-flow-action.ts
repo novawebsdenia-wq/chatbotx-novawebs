@@ -17,6 +17,70 @@ import { ensureFolderIsExists } from "@/features/folders/actions/utils"
 import { workspaceActionClient } from "@/lib/safe-action"
 import { type CreateFlowSchema, createFlowSchema } from "../schemas/action"
 
+/**
+ * Creates a flow with its first (empty) version.
+ *
+ * Exported on its own so the workspace-token API can reuse it — mirroring
+ * `updateDraftFlowVersion` and `publishFlow`, which were already plain
+ * functions. It authorizes nothing by itself: callers must have established
+ * that they may write to `workspaceId`.
+ */
+export const createFlow = async (
+  workspaceId: string,
+  parsedInput: CreateFlowSchema,
+): Promise<{ id: string }> => {
+  if (parsedInput.folderId) {
+    await ensureFolderIsExists(parsedInput.folderId, workspaceId, "flow")
+  }
+
+  const defaultNode = sendMessageNodeDefaultFn({
+    dataProps: {
+      name: "Send Message #1",
+      isStartNode: true,
+    },
+  })
+
+  const flow = await db.transaction(async (tx) => {
+    const flowId = createId()
+    const flow = await tx
+      .insert(flowModel)
+      .values({
+        ...parsedInput,
+        id: flowId,
+        workspaceId,
+      })
+      .returning()
+      .then((result) => result[0])
+
+    await tx.insert(flowAnalyticsSessionModel).values({
+      id: createId(),
+      workspaceId,
+      flowId,
+    })
+
+    await tx.insert(flowVersionModel).values({
+      id: createId(),
+      workspaceId,
+      flowId,
+      // biome-ignore lint/suspicious/noExplicitAny: temporary any to bypass circular dependency between flow and flow version
+      nodes: [defaultNode as any],
+      edges: [],
+      isDraft: true,
+      startNodeId: defaultNode.id,
+    })
+
+    return flow
+  })
+
+  await auditService.record({
+    workspaceId,
+    action: "create",
+    detail: `created a new flow (#${flow.id})`,
+  })
+
+  return { id: flow.id }
+}
+
 export const createFlowAction = workspaceActionClient
   .bindArgsSchemas(workspaceIdrequestParams)
   .inputSchema(createFlowSchema)
@@ -27,56 +91,5 @@ export const createFlowAction = workspaceActionClient
     }: {
       bindArgsParsedInputs: WorkspaceIdRequestParams
       parsedInput: CreateFlowSchema
-    }) => {
-      if (parsedInput.folderId) {
-        await ensureFolderIsExists(parsedInput.folderId, workspaceId, "flow")
-      }
-
-      const defaultNode = sendMessageNodeDefaultFn({
-        dataProps: {
-          name: "Send Message #1",
-          isStartNode: true,
-        },
-      })
-
-      const flow = await db.transaction(async (tx) => {
-        const flowId = createId()
-        const flow = await tx
-          .insert(flowModel)
-          .values({
-            ...parsedInput,
-            id: flowId,
-            workspaceId,
-          })
-          .returning()
-          .then((result) => result[0])
-
-        await tx.insert(flowAnalyticsSessionModel).values({
-          id: createId(),
-          workspaceId,
-          flowId,
-        })
-
-        await tx.insert(flowVersionModel).values({
-          id: createId(),
-          workspaceId,
-          flowId,
-          // biome-ignore lint/suspicious/noExplicitAny: temporary any to bypass circular dependency between flow and flow version
-          nodes: [defaultNode as any],
-          edges: [],
-          isDraft: true,
-          startNodeId: defaultNode.id,
-        })
-
-        return flow
-      })
-
-      await auditService.record({
-        workspaceId,
-        action: "create",
-        detail: `created a new flow (#${flow.id})`,
-      })
-
-      return { id: flow.id }
-    },
+    }) => await createFlow(workspaceId, parsedInput),
   )
