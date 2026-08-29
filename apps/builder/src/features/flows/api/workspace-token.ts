@@ -2,19 +2,24 @@ import { zodBigintAsString } from "@chatbotx.io/utils"
 import z from "zod"
 import {
   possibleErrorsOnCreatingResource,
+  possibleErrorsOnFindingResource,
   possibleErrorsOnUpdatingResource,
 } from "@/lib/orpc/orpc-error-helper"
 import { workspaceTokenAuthAPI } from "@/orpc"
 import { createFlow } from "../actions/create-flow-action"
 import { publishFlow } from "../actions/publish-flow-action"
 import { updateDraftFlowVersion } from "../actions/update-draft-flow-version-action"
-import { findDraftFlowVersionId, listFlows } from "../queries"
+import {
+  findDraftFlowVersionId,
+  findFlowForWorkspace,
+  listFlows,
+} from "../queries"
 import {
   createFlowSchema,
   publishFlowSchema,
   updateDraftFlowVersionSchema,
 } from "../schemas/action"
-import { flowResource } from "../schemas/resource"
+import { flowResource, flowWithVersionsResource } from "../schemas/resource"
 
 const flowWorkspaceTokenAPIs = {
   listFlowsWorkspaceTokenAPI: workspaceTokenAuthAPI
@@ -97,6 +102,24 @@ const flowWorkspaceTokenAPIs = {
       const { id, ...rest } = input
       await publishFlow({ workspaceId: context.workspace.id, id }, rest)
     }),
+  // `/v1/flows` returns id and name only, so a caller could list flows but
+  // never read what one actually does. This returns the flow with its versions,
+  // and so the node graph — what an external dashboard needs to render a
+  // funnel without opening the builder.
+  getFlowWorkspaceTokenAPI: workspaceTokenAuthAPI
+    .route({
+      method: "GET",
+      path: "/v1/flows/{id}",
+      summary: "Get a flow with its versions",
+      tags: ["Flows"],
+    })
+    .input(z.object({ id: zodBigintAsString() }))
+    .output(z.object({ data: flowWithVersionsResource }))
+    .errors(possibleErrorsOnFindingResource)
+    .handler(
+      async ({ context, input }) =>
+        await findFlowForWorkspace(context.workspace.id, input.id),
+    ),
 }
 
 export default flowWorkspaceTokenAPIs

@@ -18,7 +18,10 @@ import type {
   ListFlowsRequest,
   ListFlowsResponse,
 } from "../schemas/query"
-import type { FlowResource } from "../schemas/resource"
+import type {
+  FlowResource,
+  FlowWithVersionsResource,
+} from "../schemas/resource"
 
 export const listFlowsRSC = async (
   input: ListFlowsRequest & { workspaceId: string },
@@ -109,6 +112,33 @@ export const findFlow = async (
       flowVersions: true,
     },
   })
+  if (!targetFlow) {
+    throw notFoundException("Flow does not exists.")
+  }
+
+  return { data: targetFlow }
+}
+
+/**
+ * A flow with its versions — and so its node graph — for a caller that has
+ * already proven it may read this workspace.
+ *
+ * `findFlow` above is the session variant: it opens with
+ * `assertCurrentUserCanAccessChatbot`, which a workspace token cannot satisfy.
+ * The query itself is identical; splitting it here keeps the token API from
+ * duplicating the `with: { flowVersions: true }` shape.
+ *
+ * Authorizes nothing on its own.
+ */
+export const findFlowForWorkspace = async (
+  workspaceId: string,
+  id: string,
+): Promise<{ data: FlowWithVersionsResource }> => {
+  const targetFlow = await db.query.flowModel.findFirst({
+    where: { workspaceId, id },
+    with: { flowVersions: true },
+  })
+
   if (!targetFlow) {
     throw notFoundException("Flow does not exists.")
   }
