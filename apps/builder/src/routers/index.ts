@@ -186,6 +186,11 @@ export const router = {
       default: m.igCommentsAPI,
     })),
   ),
+  socialStatsAPI: lazy(() =>
+    import("@/features/social-stats/api").then((m) => ({
+      default: m.socialStatsAPI,
+    })),
+  ),
   igStoriesAPI: lazy(() =>
     import("@/features/ig-stories/api").then((m) => ({
       default: m.igStoriesAPI,

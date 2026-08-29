@@ -56,7 +56,11 @@ async function collectInstagramMedia(
       return media.map<InstagramAutomationMedia>((item) => ({
         id: item.id,
         message: item.caption,
-        full_picture: item.media_url ?? item.thumbnail_url,
+        // `thumbnail_url` primero: en un REEL o VIDEO, `media_url` es el
+        // fichero MP4, no una imagen, asi que un <img> con esa url no pinta
+        // nada. Graph solo devuelve `thumbnail_url` para video, asi que una
+        // foto cae igualmente en `media_url`.
+        full_picture: item.thumbnail_url ?? item.media_url,
         created_time: item.timestamp,
         permalink_url: item.permalink,
         media_product_type: item.media_product_type,
