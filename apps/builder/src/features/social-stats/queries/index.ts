@@ -169,9 +169,8 @@ export async function facebookOverview(
   workspaceId: string,
   days: number,
 ): Promise<{ data: InstagramOverview }> {
-  const integrations = await messengerIntegrationService.findByWorkspaceId(
-    workspaceId,
-  )
+  const integrations =
+    await messengerIntegrationService.findByWorkspaceId(workspaceId)
   const integration = integrations[0]
   if (!integration) {
     return { data: VACIO }
