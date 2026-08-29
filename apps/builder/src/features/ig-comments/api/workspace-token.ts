@@ -87,7 +87,10 @@ const updateIgCommentWorkspaceTokenAPI = workspaceTokenAuthAPI
   .errors(possibleErrorsOnUpdatingResource)
   .handler(async ({ context, input }) => {
     const { id, ...rest } = input
-    return await updateIgComment({ workspaceId: context.workspace.id, id }, rest)
+    return await updateIgComment(
+      { workspaceId: context.workspace.id, id },
+      rest,
+    )
   })
 
 const deleteIgCommentWorkspaceTokenAPI = workspaceTokenAuthAPI
