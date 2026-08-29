@@ -169,10 +169,20 @@ function sortConnectableFirst(
 
 const FACEBOOK_OAUTH_BASE = "https://www.facebook.com"
 
+/**
+ * Lo minimo para conectar una pagina y responder sus mensajes y comentarios.
+ *
+ * Se han quitado `pages_manage_ads`, `pages_utility_messaging` y `page_events`:
+ * Meta los declara «Invalid Scopes» salvo que la app anada los casos de uso de
+ * anuncios, mensajes de utilidad y eventos de pagina — y un scope invalido en
+ * la peticion tumba TODO el OAuth, no solo esa parte. Quien use anuncios
+ * click-to-Messenger o lead ads los pide aparte en `LEAD_ADS_SCOPES` y en
+ * `messaging-ads-scopes`, asi que quitarlos de aqui no los pierde: solo deja
+ * de exigirlos a quien nada mas quiere Messenger.
+ */
 export const MESSENGER_SCOPES = [
   "email",
   "public_profile",
-  "pages_manage_ads",
   "pages_manage_metadata",
   "pages_read_engagement",
   "pages_read_user_content",
@@ -181,8 +191,6 @@ export const MESSENGER_SCOPES = [
   "pages_messaging",
   "pages_show_list",
   "business_management",
-  "pages_utility_messaging",
-  "page_events",
 ]
 
 /**
