@@ -1,6 +1,7 @@
 import {
   instagramIntegrationService,
   messengerIntegrationService,
+  tiktokIntegrationService,
 } from "@chatbotx.io/business"
 import {
   getInstagramAccountInsights,
@@ -8,6 +9,10 @@ import {
   type InstagramAuthValue,
   listInstagramMediaEngagement,
 } from "@chatbotx.io/integration-instagram"
+import {
+  getUserStats,
+  type TiktokAuthValue,
+} from "@chatbotx.io/integration-tiktok"
 import {
   getFacebookPageOverview,
   listFacebookPagePosts,
@@ -229,6 +234,57 @@ export async function facebookOverview(
         saved: null,
         shares: null,
       })),
+    },
+  }
+}
+
+/**
+ * El resumen de la cuenta de TikTok conectada.
+ *
+ * Misma forma que Instagram y Facebook para que la pantalla no distinga.
+ *
+ * TikTok da contadores de cuenta, no una serie: seguidores, seguidos, me
+ * gusta acumulados y numero de videos. Los me gusta son el TOTAL historico de
+ * la cuenta, no los de la ventana pedida — `video.list` daria el detalle por
+ * video, y esta conexion no lo solicita. Por eso `days` no se usa aqui, y
+ * `posts` va vacio en vez de fingir un listado.
+ *
+ * Autoriza nada: quien llama ya debe haber probado que puede leer el espacio.
+ */
+export async function tiktokOverview(
+  workspaceId: string,
+): Promise<{ data: InstagramOverview }> {
+  const integrations = await tiktokIntegrationService.findAllByWorkspaceIds([
+    workspaceId,
+  ])
+  const integration = integrations[0]
+  if (!integration) {
+    return { data: VACIO }
+  }
+
+  const auth = integration.auth as TiktokAuthValue
+  const cuenta = await getUserStats({ accessToken: auth.tokens.accessToken })
+
+  return {
+    data: {
+      account: {
+        username: cuenta.username ?? integration.name ?? "",
+        avatar: cuenta.avatar_url ?? null,
+      },
+      followers: cuenta.follower_count ?? 0,
+      followerHistory: [],
+      insightsAvailable: false,
+      totals: {
+        posts: cuenta.video_count ?? 0,
+        views: 0,
+        reach: 0,
+        likes: cuenta.likes_count ?? 0,
+        comments: 0,
+        saved: 0,
+        shares: 0,
+        interactions: cuenta.likes_count ?? 0,
+      },
+      posts: [],
     },
   }
 }

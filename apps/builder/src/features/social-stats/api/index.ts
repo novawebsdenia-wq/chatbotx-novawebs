@@ -1,7 +1,11 @@
 import z from "zod"
 import { possibleErrorsOnFindingResource } from "@/lib/orpc/orpc-error-helper"
 import { workspaceTokenAuthAPI } from "@/orpc"
-import { facebookOverview, instagramOverview } from "../queries"
+import {
+  facebookOverview,
+  instagramOverview,
+  tiktokOverview,
+} from "../queries"
 
 /**
  * El resumen de la cuenta de Instagram conectada.
@@ -83,7 +87,22 @@ const facebookOverviewWorkspaceTokenAPI = workspaceTokenAuthAPI
       await facebookOverview(context.workspace.id, input.days),
   )
 
+const tiktokOverviewWorkspaceTokenAPI = workspaceTokenAuthAPI
+  .route({
+    method: "GET",
+    path: "/v1/social-stats/tiktok",
+    summary: "Follower and engagement counters of the TikTok account",
+    tags: ["Social Stats"],
+  })
+  // `days` se acepta por simetria con las otras dos, pero TikTok solo devuelve
+  // contadores de cuenta: no hay ventana que aplicar.
+  .input(entrada)
+  .output(salida)
+  .errors(possibleErrorsOnFindingResource)
+  .handler(async ({ context }) => await tiktokOverview(context.workspace.id))
+
 export const socialStatsAPI = {
   instagramOverviewWorkspaceTokenAPI,
   facebookOverviewWorkspaceTokenAPI,
+  tiktokOverviewWorkspaceTokenAPI,
 }
