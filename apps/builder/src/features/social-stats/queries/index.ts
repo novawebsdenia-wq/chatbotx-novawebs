@@ -10,14 +10,14 @@ import {
   listInstagramMediaEngagement,
 } from "@chatbotx.io/integration-instagram"
 import {
-  getUserStats,
-  type TiktokAuthValue,
-} from "@chatbotx.io/integration-tiktok"
-import {
   getFacebookPageOverview,
   listFacebookPagePosts,
   type MessengerAuthValue,
 } from "@chatbotx.io/integration-messenger"
+import {
+  getUserStats,
+  type TiktokAuthValue,
+} from "@chatbotx.io/integration-tiktok"
 
 export type InstagramOverview = {
   account: { username: string; avatar: string | null } | null
