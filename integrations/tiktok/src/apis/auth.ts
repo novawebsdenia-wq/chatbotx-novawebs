@@ -24,11 +24,16 @@ const TIKTOK_REFRESH_URL = `${BUSINESS_API_BASE_URL}tt_user/oauth2/refresh_token
 const TIKTOK_MESSAGING_ENABLED = process.env.TIKTOK_MESSAGING === "true"
 
 const TIKTOK_SCOPES = [
+  // Los tres del Login Kit, y solo esos. Cubren lo que el codigo pide de
+  // verdad: `user/info/` lee open_id, display_name y avatar_url (basic) mas
+  // username (profile), y las estadisticas salen de stats.
+  //
+  // Se quitaron `user.info.username` y `user.account.type`: el primero no es
+  // un scope del Login Kit y el segundo no lo usa nadie en el codigo. TikTok
+  // rechazaba el OAuth entero con «scope» por culpa de ellos.
   "user.info.basic",
-  "user.info.username",
   "user.info.profile",
   "user.info.stats",
-  "user.account.type",
   ...(TIKTOK_MESSAGING_ENABLED
     ? ["message.list.read", "message.list.send", "message.list.manage"]
     : []),
