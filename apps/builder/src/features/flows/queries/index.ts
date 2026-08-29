@@ -1,7 +1,7 @@
 import { notFoundException } from "@chatbotx.io/business/errors"
 import { db, relationsFilterToSQL } from "@chatbotx.io/database/client"
 import { rootFolderId } from "@chatbotx.io/database/partials"
-import { flowModel } from "@chatbotx.io/database/schema"
+import { flowModel, flowVersionModel } from "@chatbotx.io/database/schema"
 import {
   likeContains,
   parseOrderByAsObject,
@@ -134,4 +134,30 @@ export const ensureAllFlowIdsExists = async (
   if (count !== flowIds.length) {
     throw notFoundException("Flow does not exists.")
   }
+}
+
+/**
+ * The id of a flow's live draft version.
+ *
+ * A flow has many versions and exactly one open draft; the write endpoints take
+ * the *version* id, not the flow id. Callers holding only a flow id (the public
+ * API, a script) resolve it here instead of querying the table themselves.
+ *
+ * Authorizes nothing: the caller must already have established it may read this
+ * workspace.
+ */
+export const findDraftFlowVersionId = async (
+  workspaceId: string,
+  flowId: string,
+): Promise<string> => {
+  const draft = await db.query.flowVersionModel.findFirst({
+    columns: { id: true },
+    where: { workspaceId, flowId, isDraft: true },
+  })
+
+  if (!draft) {
+    throw notFoundException("Draft flow version not found")
+  }
+
+  return draft.id
 }

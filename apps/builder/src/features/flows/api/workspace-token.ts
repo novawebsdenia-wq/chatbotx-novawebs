@@ -8,7 +8,7 @@ import { workspaceTokenAuthAPI } from "@/orpc"
 import { createFlow } from "../actions/create-flow-action"
 import { publishFlow } from "../actions/publish-flow-action"
 import { updateDraftFlowVersion } from "../actions/update-draft-flow-version-action"
-import { listFlows } from "../queries"
+import { findDraftFlowVersionId, listFlows } from "../queries"
 import {
   createFlowSchema,
   publishFlowSchema,
@@ -71,8 +71,12 @@ const flowWorkspaceTokenAPIs = {
     )
     .output(z.void())
     .errors(possibleErrorsOnUpdatingResource)
+    // `updateDraftFlowVersion` takes the *version* id, but the caller only has
+    // the flow id — the one this route's path promises. Resolving the draft
+    // here keeps the contract honest: pass a flow id, get its draft written.
     .handler(async ({ context, input }) => {
-      const { id, ...rest } = input
+      const { id: flowId, ...rest } = input
+      const id = await findDraftFlowVersionId(context.workspace.id, flowId)
       await updateDraftFlowVersion(
         { workspaceId: context.workspace.id, id },
         rest,
