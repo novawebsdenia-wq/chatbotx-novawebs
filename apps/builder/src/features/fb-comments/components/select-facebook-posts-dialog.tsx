@@ -210,10 +210,20 @@ export function SelectFacebookPostsDialog({
   const [selectedIds, setSelectedIds] = useState<string[]>(value)
   const [selectedPageId, setSelectedPageId] = useState<string>(ALL_PAGES_VALUE)
 
+  // Sincroniza SOLO en el flanco de apertura, no cada vez que cambia `value`.
+  //
+  // `value` llega de `useWatch`, que devuelve una referencia nueva cuando el
+  // formulario re-renderiza. Con `value` en las dependencias, cualquier
+  // re-render mientras el dialogo estaba abierto volvia a ejecutar el efecto y
+  // reseteaba `selectedIds` a lo ya guardado — la lista vacia — borrando la
+  // seleccion del usuario sin avisar. Como la seleccion solo se escribe en el
+  // formulario al confirmar, se perdia entera.
+  const estabaAbierto = useRef(open)
   useEffect(() => {
-    if (open) {
+    if (open && !estabaAbierto.current) {
       setSelectedIds(value)
     }
+    estabaAbierto.current = open
   }, [open, value])
 
   const filterByPage = (posts: FacebookPost[]) =>

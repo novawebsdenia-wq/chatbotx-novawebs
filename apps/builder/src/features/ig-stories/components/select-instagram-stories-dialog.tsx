@@ -208,11 +208,22 @@ export function SelectInstagramStoriesDialog({
   })
   const selectedPageId = pageFilterForm.watch("pageId")
 
+  // Sincroniza SOLO en el flanco de apertura, no cada vez que cambia `value`.
+  //
+  // `value` llega de `useWatch`, que devuelve una referencia nueva cuando el
+  // formulario re-renderiza. Con `value` en las dependencias, cualquier
+  // re-render mientras el dialogo estaba abierto volvia a ejecutar el efecto y
+  // reseteaba `selectedIds` a lo ya guardado — la lista vacia — borrando la
+  // seleccion del usuario sin avisar. Como la seleccion solo se escribe en el
+  // formulario al confirmar, se perdia entera. Aqui ademas reseteaba el filtro
+  // de pagina a mitad de uso.
+  const estabaAbierto = useRef(open)
   useEffect(() => {
-    if (open) {
+    if (open && !estabaAbierto.current) {
       setSelectedIds(value)
       pageFilterForm.reset({ pageId: ALL_PAGES_VALUE })
     }
+    estabaAbierto.current = open
   }, [open, value, pageFilterForm.reset])
 
   const pageStories =
