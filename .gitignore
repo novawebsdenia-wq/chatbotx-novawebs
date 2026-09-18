@@ -61,3 +61,6 @@ CLAUDE.md
 
 .pnpm-store/
 .plans/
+
+# Cache de graphify (regenerable)
+graphify-out/
