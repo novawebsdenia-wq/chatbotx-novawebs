@@ -16,6 +16,7 @@ import { logger } from "../../../lib/logger"
 import { integrationService } from "../../../services/integrations"
 import {
   computeDelayMs,
+  isCatchAll,
   isCommentReply,
   matchKeywords,
   matchPost,
@@ -83,6 +84,23 @@ export async function processCommentAutomation(
     auth,
   })
 
+  const isReply = isCommentReply(parentId, postId)
+  const keywordAutomationMatched = automations.some(
+    (automation) =>
+      !isCatchAll(automation.includeKeywords) &&
+      fbCommentAutomationService.isWithinSchedule(
+        automation,
+        workspace.timezone,
+      ) &&
+      matchPost(automation.post, postId) &&
+      !(automation.options.ignoreCommentReplies && isReply) &&
+      matchKeywords(
+        automation.includeKeywords,
+        automation.excludeKeywords,
+        message,
+      ),
+  )
+
   for (const automation of automations) {
     try {
       if (
@@ -136,6 +154,16 @@ export async function processCommentAutomation(
           postId,
           workspaceId,
           reason: "keywords do not match",
+        })
+        continue
+      }
+      if (keywordAutomationMatched && isCatchAll(automation.includeKeywords)) {
+        logAutomationSkipped({
+          automationId: automation.id,
+          commentId,
+          postId,
+          workspaceId,
+          reason: "a keyword automation matched",
         })
         continue
       }
