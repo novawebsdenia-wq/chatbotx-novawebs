@@ -173,6 +173,8 @@ const COMMENT_ID = `${STORY_ID}_1544045903933592`
 const OTHER_COMMENT_ID = `${STORY_ID}_9999999999999999`
 
 type AutomationOverrides = {
+  id?: string
+  includeKeywords?: { type: string; value: string[] }
   options?: Record<string, boolean>
   post?: { type: string; value: string[] }
   publicReply?: { type: string; value: string | null }
@@ -182,9 +184,9 @@ type AutomationOverrides = {
 
 function buildAutomation(overrides: AutomationOverrides = {}) {
   return {
-    id: "automation-1",
+    id: overrides.id ?? "automation-1",
     post: overrides.post ?? { type: "all", value: [] },
-    includeKeywords: { type: "all", value: [] },
+    includeKeywords: overrides.includeKeywords ?? { type: "all", value: [] },
     excludeKeywords: [],
     publicReply: overrides.publicReply ?? { type: "none", value: null },
     privateReply: overrides.privateReply ?? { type: "none", value: null },
@@ -362,6 +364,62 @@ describe("processCommentAutomation matchPost normalization", () => {
     expect(mockLoggerInfo).toHaveBeenCalledWith(
       expect.objectContaining({ reason: "post does not match" }),
       "Comment automation skipped",
+    )
+  })
+})
+
+describe("processCommentAutomation catch-all vs keyword automations", () => {
+  const welcome = () => buildAutomation({ id: "welcome" })
+  const keyword = () =>
+    buildAutomation({
+      id: "keyword-rea",
+      includeKeywords: { type: "contain", value: ["rea"] },
+    })
+
+  test("only the keyword automation answers a comment that matches it", async () => {
+    mockFindActiveAutomations.mockResolvedValue([welcome(), keyword()])
+
+    await processCommentAutomation(buildJobData({ message: "REA" }) as any)
+
+    expect(mockInsertDedup).toHaveBeenCalledTimes(1)
+    expect(mockInsertDedup).toHaveBeenCalledWith(
+      expect.objectContaining({ automationId: "keyword-rea" }),
+    )
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      expect.objectContaining({
+        automationId: "welcome",
+        reason: "a keyword automation matched",
+      }),
+      "Comment automation skipped",
+    )
+  })
+
+  test("the catch-all automation answers when no keyword automation matches", async () => {
+    mockFindActiveAutomations.mockResolvedValue([welcome(), keyword()])
+
+    await processCommentAutomation(buildJobData({ message: "hola" }) as any)
+
+    expect(mockInsertDedup).toHaveBeenCalledTimes(1)
+    expect(mockInsertDedup).toHaveBeenCalledWith(
+      expect.objectContaining({ automationId: "welcome" }),
+    )
+  })
+
+  test("a keyword automation for another post does not silence the catch-all", async () => {
+    mockFindActiveAutomations.mockResolvedValue([
+      welcome(),
+      buildAutomation({
+        id: "keyword-rea",
+        includeKeywords: { type: "contain", value: ["rea"] },
+        post: { type: "postIds", value: ["8888888888"] },
+      }),
+    ])
+
+    await processCommentAutomation(buildJobData({ message: "REA" }) as any)
+
+    expect(mockInsertDedup).toHaveBeenCalledTimes(1)
+    expect(mockInsertDedup).toHaveBeenCalledWith(
+      expect.objectContaining({ automationId: "welcome" }),
     )
   })
 })

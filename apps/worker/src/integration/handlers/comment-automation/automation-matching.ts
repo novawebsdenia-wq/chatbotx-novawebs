@@ -55,6 +55,13 @@ export function matchKeywords(
   return true
 }
 
+// An automation without include keywords answers every comment (a welcome
+// reply). When a keyword automation also matches the same comment, only the
+// keyword one should answer, or the user gets two public replies and two DMs.
+export function isCatchAll(includeKeywords: FBCommentIncludeKeywords): boolean {
+  return includeKeywords.type === "all" || includeKeywords.value.length === 0
+}
+
 // Facebook feed webhooks set parent_id on every comment: for a top-level
 // comment it equals the post id, and only a reply to another comment carries
 // that comment's id instead.
