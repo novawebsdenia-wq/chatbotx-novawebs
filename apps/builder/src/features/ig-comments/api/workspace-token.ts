@@ -22,6 +22,7 @@ import {
   possibleErrorsOnFindingResource,
   possibleErrorsOnUpdatingResource,
 } from "@/lib/orpc/orpc-error-helper"
+import { basePaginationRequest } from "@/lib/pagination"
 import { workspaceTokenAuthAPI } from "@/orpc"
 import { createIgComment } from "../actions/create-ig-comment.action"
 import { deleteIgComment } from "../actions/delete-ig-comment.action"
@@ -49,9 +50,12 @@ const listIgCommentsWorkspaceTokenAPI = workspaceTokenAuthAPI
   // `listIgCommentsRequest` is an intersection (pagination AND filters), so it
   // has no `.omit()` to drop `workspaceId` with. The filters are declared here
   // instead, and the workspace comes from the token — same shape the handler
-  // gets, minus the field the caller must not be able to set.
+  // gets, minus the field the caller must not be able to set. Pagination comes
+  // from the same `basePaginationRequest`: without it the route silently served
+  // only the first page (20), so a workspace with more automations could never
+  // list the rest.
   .input(
-    z.object({
+    basePaginationRequest.extend({
       name: z.string().nullish(),
       folderId: zodBigintAsString().nullish(),
       isActive: z.boolean().nullish(),
