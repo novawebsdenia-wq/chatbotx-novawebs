@@ -208,6 +208,8 @@ export const findDraftFlowVersionId = async (
  *
  * `message:delivered` marca que el nodo se ejecuto; `flow:clicked` lleva el
  * `buttonId`, asi que sirve de tasa de pulsacion real, no estimada.
+ * `failed` son las personas a las que algun mensaje no les llego
+ * (`message:failed`), contadas una vez aunque fallen en varios nodos.
  *
  * Autoriza nada: quien llama ya debe haber probado que puede leer el espacio.
  */
@@ -218,8 +220,20 @@ export const flowFunnelStats = async (
   data: {
     nodes: { nodeId: string; contacts: number }[]
     buttons: { buttonId: string; contacts: number }[]
+    failed: number
   }
 }> => {
+  const [fallidos] = await db
+    .select({ contacts: countDistinct(flowNodeStatModel.contactId) })
+    .from(flowNodeStatModel)
+    .where(
+      and(
+        eq(flowNodeStatModel.workspaceId, workspaceId),
+        eq(flowNodeStatModel.flowId, flowId),
+        eq(flowNodeStatModel.eventType, "message:failed"),
+      ),
+    )
+
   const filas = await db
     .select({
       nodeId: flowNodeStatModel.nodeId,
@@ -248,6 +262,7 @@ export const flowFunnelStats = async (
       buttons: filas
         .filter((f) => f.eventType === "flow:clicked" && f.buttonId)
         .map((f) => ({ buttonId: f.buttonId as string, contacts: f.contacts })),
+      failed: fallidos?.contacts ?? 0,
     },
   }
 }

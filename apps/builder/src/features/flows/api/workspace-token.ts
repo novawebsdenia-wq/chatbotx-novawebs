@@ -141,6 +141,7 @@ const flowWorkspaceTokenAPIs = {
           buttons: z.array(
             z.object({ buttonId: z.string(), contacts: z.number() }),
           ),
+          failed: z.number(),
         }),
       }),
     )
