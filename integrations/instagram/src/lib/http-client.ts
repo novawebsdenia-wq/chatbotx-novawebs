@@ -43,6 +43,14 @@ function sanitizeRequestUrl(url: string | undefined): string | undefined {
   }
 }
 
+// The HTTPError carries the request URL, whose query can hold client_secret and
+// access tokens; an uncaught exception logs it verbatim. Keep status and body only.
+function withoutRequestUrl(error: unknown): unknown {
+  return isHTTPError(error)
+    ? { httpStatus: error.response.status, errorBody: error.data }
+    : error
+}
+
 export function logChannelError(
   source: ChannelErrorSource,
   context: { url?: string; method?: string },
@@ -123,7 +131,7 @@ class InstagramHttpClient {
       sdkException.code,
       sdkException.subCode,
       sdkException.type,
-      error,
+      withoutRequestUrl(error),
     )
   }
 
