@@ -10,7 +10,6 @@ const INSTAGRAM_SCOPES = [
   "instagram_manage_comments",
   "instagram_manage_engagement",
   "instagram_manage_messages",
-  "instagram_manage_events",
   "pages_manage_metadata",
   "pages_show_list",
   "pages_messaging",
