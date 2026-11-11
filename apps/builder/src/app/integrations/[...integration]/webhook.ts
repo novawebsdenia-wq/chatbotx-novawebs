@@ -1,5 +1,6 @@
 import {
   customDomainService,
+  instagramIntegrationService,
   platformCredentialService,
   resolveWorkspaceFreezeReason,
   tenantService,
@@ -13,6 +14,7 @@ import type {
   TiktokAuthValue,
   TiktokConfig,
 } from "@chatbotx.io/integration-tiktok"
+import type { ContextQueue } from "@chatbotx.io/sdk"
 import { integrationQueue } from "@chatbotx.io/worker-config"
 import type { NextRequest } from "next/server"
 import { isCloud } from "@/env"
@@ -26,6 +28,40 @@ import { logWebhookRequestBody } from "@/lib/webhook-log"
 type CredentialType = Parameters<
   typeof platformCredentialService.resolveForOwner
 >[0]["type"]
+
+/**
+ * One Meta app can deliver the same Instagram account twice: through
+ * Instagram Login (`/integrations/instagram/webhook`) and, when the account's
+ * linked Facebook Page is subscribed to the app, through Facebook Login
+ * (`/integrations/instagram-facebook/webhook`). Both paths enqueue the same
+ * jobs (comment automations share the `comment-auto-<commentId>` jobId), so
+ * whichever lands first would decide which automation type runs and the other
+ * would be dropped. Only the path the account was connected with goes through.
+ */
+const INSTAGRAM_LOGIN_TYPES = {
+  instagram: "instagram",
+  instagramFacebook: "facebook",
+} as const
+
+const instagramQueueFor = (
+  path: keyof typeof INSTAGRAM_LOGIN_TYPES,
+): ContextQueue => ({
+  add: async (name, payload, opts) => {
+    const igId: unknown = payload?.data?.integrationIdentifier
+    if (typeof igId === "string") {
+      const loginType =
+        await instagramIntegrationService.findLoginTypeByIgId(igId)
+      if (loginType && loginType !== INSTAGRAM_LOGIN_TYPES[path]) {
+        logger.debug(
+          { igId, name, path },
+          "instagram webhook skipped: account connected through the other login",
+        )
+        return
+      }
+    }
+    return integrationQueue.add(name, payload, opts)
+  },
+})
 
 /**
  * Per-bot/per-account channels (telegram, tiktok) reach their integration
@@ -166,7 +202,11 @@ export const handleWebhook = async (
         // biome-ignore lint/suspicious/noExplicitAny: safe pass value
       } as any,
       req,
-      queue: integrationQueue,
+      queue:
+        integrationType === "instagram" ||
+        integrationType === "instagramFacebook"
+          ? instagramQueueFor(integrationType)
+          : integrationQueue,
     })
 
     return new Response(result as BodyInit)
