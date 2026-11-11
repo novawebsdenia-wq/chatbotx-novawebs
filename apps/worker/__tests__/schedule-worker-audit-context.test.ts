@@ -165,3 +165,42 @@ describe("schedule worker audit context", () => {
     expect(mocks.teardownExpiredTrial).toHaveBeenCalledWith("user-1")
   })
 })
+
+describe("schedule worker stall guard", () => {
+  const refreshJob = (stalledCounter: number) => ({
+    id: "repeat:refreshChannelTokens:1794362400000",
+    repeatJobKey: "refreshChannelTokens",
+    stalledCounter,
+    data: { type: "refreshChannelTokens", data: {} },
+  })
+
+  test("runs a repeatable job that has stalled fewer than 3 times", async () => {
+    const { refreshChannelTokens } = await import(
+      "../src/schedule/handlers/refresh-channel-tokens"
+    )
+
+    await mocks.processJob?.(refreshJob(2))
+
+    expect(refreshChannelTokens).toHaveBeenCalledTimes(1)
+  })
+
+  test("drops the run of a repeatable job that keeps crashing the worker", async () => {
+    const { refreshChannelTokens } = await import(
+      "../src/schedule/handlers/refresh-channel-tokens"
+    )
+
+    await mocks.processJob?.(refreshJob(3))
+
+    expect(refreshChannelTokens).not.toHaveBeenCalled()
+  })
+
+  test("leaves one-off jobs alone whatever their stall count", async () => {
+    await mocks.processJob?.({
+      id: "job-2",
+      stalledCounter: 5,
+      data: { type: "teardownExpiredTrial", data: { userId: "user-2" } },
+    })
+
+    expect(mocks.teardownExpiredTrial).toHaveBeenCalledWith("user-2")
+  })
+})
