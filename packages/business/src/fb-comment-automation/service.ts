@@ -101,6 +101,38 @@ class FbCommentAutomationService extends BaseService {
       .where(eq(fbCommentAutomationModel.id, automationId))
   }
 
+  /**
+   * Undoes `insertDedup` + `incrementRepliesCount` for a reply that never
+   * reached the contact, so their next comment on the post is answered.
+   * Returns whether a mark existed.
+   */
+  async revokeReply(props: {
+    automationId: string
+    contactId: string
+    postId: string
+  }): Promise<boolean> {
+    const deleted = await db
+      .delete(fbCommentAutomationReplyModel)
+      .where(
+        and(
+          eq(fbCommentAutomationReplyModel.automationId, props.automationId),
+          eq(fbCommentAutomationReplyModel.contactId, props.contactId),
+          eq(fbCommentAutomationReplyModel.postId, props.postId),
+        ),
+      )
+      .returning({ id: fbCommentAutomationReplyModel.id })
+    if (deleted.length === 0) {
+      return false
+    }
+    await db
+      .update(fbCommentAutomationModel)
+      .set({
+        repliesCount: sql`greatest(${fbCommentAutomationModel.repliesCount} - 1, 0)`,
+      })
+      .where(eq(fbCommentAutomationModel.id, props.automationId))
+    return true
+  }
+
   async deleteMany(input: {
     workspaceId: string
     ids: string[]

@@ -51,6 +51,7 @@ export const IntegrationJobAction = {
   updateContactAvatar: "updateContactAvatar",
   channelLabelChange: "channelLabelChange",
   processCommentAutomation: "processCommentAutomation",
+  verifyCommentAutomationReply: "verifyCommentAutomationReply",
   commentAIReply: "commentAIReply",
   processLeadgen: "processLeadgen",
   processStoryReplyAutomation: "processStoryReplyAutomation",
@@ -525,6 +526,26 @@ export type IntegrationJobProcessCommentAutomation = {
   }
 }
 
+/**
+ * Delayed check, queued by `processCommentAutomation`, that the reply a
+ * comment automation dispatched asynchronously actually reached the contact.
+ * `deliverable` is the reply that counts: the DM when the automation sends
+ * one, otherwise the public reply.
+ */
+export type IntegrationJobVerifyCommentAutomationReply = {
+  type: typeof IntegrationJobAction.verifyCommentAutomationReply
+  data: {
+    workspaceId: string
+    conversationId: string
+    commentId: string
+    automationId: string
+    contactId: string
+    postId: string
+    deliverable: "public" | "private"
+    dispatchedAt: string
+  }
+}
+
 export type IntegrationJobCommentAIReply = {
   type: typeof IntegrationJobAction.commentAIReply
   data: {
@@ -613,6 +634,7 @@ export type IntegrationJobData =
   | IntegrationJobUpdateContactAvatar
   | IntegrationJobChannelLabelChange
   | IntegrationJobProcessCommentAutomation
+  | IntegrationJobVerifyCommentAutomationReply
   | IntegrationJobCommentAIReply
   | IntegrationJobProcessLeadgen
   | IntegrationJobProcessStoryReplyAutomation

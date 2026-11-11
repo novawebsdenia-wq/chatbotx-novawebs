@@ -29,6 +29,7 @@ import { coexistWhatsappBuffer } from "./handlers/coexist/whatsapp-buffer"
 import { coexistWhatsappFlush } from "./handlers/coexist/whatsapp-flush"
 import { processCommentAutomation } from "./handlers/comment-automation"
 import { processCommentAIReply } from "./handlers/comment-automation/ai-reply"
+import { verifyCommentAutomationReply } from "./handlers/comment-automation/verify-reply"
 import { updateContactAvatar } from "./handlers/contact/update-avatar"
 import { agentMarkAsRead, contactMarkAsRead } from "./handlers/conversation"
 import {
@@ -300,6 +301,10 @@ async function startIntegrationWorker() {
               }
               case IntegrationJobAction.processCommentAutomation: {
                 await processCommentAutomation(job.data.data)
+                return
+              }
+              case IntegrationJobAction.verifyCommentAutomationReply: {
+                await verifyCommentAutomationReply(job.data.data)
                 return
               }
               case IntegrationJobAction.commentAIReply: {
