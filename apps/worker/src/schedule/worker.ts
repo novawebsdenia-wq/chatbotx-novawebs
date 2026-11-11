@@ -38,6 +38,15 @@ import { syncUserQuota } from "./handlers/sync-user-quota"
 import { teardownExpiredTrial } from "./handlers/teardown-expired-trial"
 import { unsubscribeExpiredTrials } from "./handlers/unsubscribe-expired-trials"
 
+/**
+ * BullMQ never fails a repeatable job for stalling: each time the worker dies
+ * mid-job it moves it back to wait, and stalls do not count as attempts. A
+ * job that crashes the process (the 02:00 token refresh hit an OOM) therefore
+ * re-runs on every restart forever — 694 times on 11 Nov 2026. Past this many
+ * stalls the run is dropped; the scheduler fires again at its next tick.
+ */
+const MAX_REPEAT_JOB_STALLS = 3
+
 async function startScheduleWorker() {
   try {
     await ensureBootstrapped()
@@ -59,8 +68,20 @@ async function startScheduleWorker() {
 
   const worker = new Worker(
     queueNames.enum.schedule,
-    async (job: Job<ScheduleJobData>) =>
-      runJobWithAuditContext(
+    async (job: Job<ScheduleJobData>) => {
+      if (job.repeatJobKey && job.stalledCounter >= MAX_REPEAT_JOB_STALLS) {
+        logger.error(
+          {
+            jobId: job.id,
+            type: job.data.type,
+            stalledCounter: job.stalledCounter,
+          },
+          "Repeatable schedule job stalled too many times, skipping this run",
+        )
+        return
+      }
+
+      return await runJobWithAuditContext(
         { source: `schedule:${job.data.type}` },
         async () => {
           switch (job.data.type) {
@@ -160,7 +181,8 @@ async function startScheduleWorker() {
               logger.warn("Unknown schedule job type")
           }
         },
-      ),
+      )
+    },
     {
       connection: getRedisConnection(),
       ...defaultWorkerOptions,

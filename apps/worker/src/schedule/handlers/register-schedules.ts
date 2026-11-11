@@ -18,6 +18,17 @@ const CLOUD_ONLY_SCHEDULERS = [
   ScheduleJobData.unsubscribeExpiredTrials,
 ] as const
 
+/**
+ * Explicit retry budget for the token refresh: a thrown run is retried twice,
+ * one and then two minutes later, instead of the queue default (5 s). Stalls
+ * caused by a crashing worker are not attempts in BullMQ; those are capped in
+ * the schedule worker (`MAX_REPEAT_JOB_STALLS`).
+ */
+const REFRESH_TOKENS_JOB_OPTIONS = {
+  attempts: 3,
+  backoff: { type: "exponential", delay: 60_000 },
+} as const
+
 export const registerSchedules = async () => {
   if (!(scheduleQueue instanceof Queue)) {
     return
@@ -292,6 +303,7 @@ export const registerSchedules = async () => {
         type: ScheduleJobData.refreshChannelTokens,
         data: {},
       },
+      opts: REFRESH_TOKENS_JOB_OPTIONS,
     },
   )
 
@@ -312,6 +324,7 @@ export const registerSchedules = async () => {
           channels: [channelTypes.enum.zalo, channelTypes.enum.tiktok],
         },
       },
+      opts: REFRESH_TOKENS_JOB_OPTIONS,
     },
   )
 
