@@ -3,14 +3,19 @@ import {
   fbCommentAutomationService,
   workspaceService,
 } from "@chatbotx.io/business"
-import type { IntegrationType } from "@chatbotx.io/database/partials"
+import type {
+  FBCommentReply,
+  IntegrationType,
+} from "@chatbotx.io/database/partials"
 import { createMessageRepository } from "@chatbotx.io/database/repositories"
 import type { ConversationModel } from "@chatbotx.io/database/types"
 import type { MessengerAuthValue } from "@chatbotx.io/integration-messenger"
 import {
   ChatJobAction,
   chatQueue,
+  IntegrationJobAction,
   type IntegrationJobProcessCommentAutomation,
+  integrationQueue,
 } from "@chatbotx.io/worker-config"
 import { logger } from "../../../lib/logger"
 import { integrationService } from "../../../services/integrations"
@@ -32,6 +37,28 @@ import { executePrivateReply } from "./private-reply"
 import { executePublicReply } from "./public-reply"
 
 export { isCommentReply } from "./automation-matching"
+
+/**
+ * Margin after the reply delay before checking delivery: sends retry within
+ * seconds, so a reply still neither sent nor failed by then is left alone.
+ */
+const VERIFY_REPLY_GRACE_MS = 120_000
+
+/**
+ * The reply whose delivery decides whether the contact counts as answered:
+ * the DM when the automation sends one (the public reply only announces it),
+ * otherwise the public reply. A text DM is sent inline in this job and a
+ * failure there already skips the mark, so it needs no later check.
+ */
+function asyncDeliverable(automation: {
+  publicReply: FBCommentReply
+  privateReply: FBCommentReply
+}): "public" | "private" | null {
+  if (willSendReply(automation.privateReply)) {
+    return automation.privateReply.type === "text" ? null : "private"
+  }
+  return willSendReply(automation.publicReply) ? "public" : null
+}
 
 export async function processCommentAutomation(
   data: IntegrationJobProcessCommentAutomation["data"],
@@ -285,6 +312,7 @@ export async function processCommentAutomation(
       }
 
       let dispatchFailed = false
+      const dispatchedAt = new Date()
 
       try {
         await executePublicReply(automation.publicReply, {
@@ -336,12 +364,10 @@ export async function processCommentAutomation(
         }
       }
 
-      // Dedup/count fire once dispatch is *enqueued*, not once an async reply
-      // (flow, AIAgent) actually succeeds — a later failure inside that job
-      // (e.g. agent misconfigured, no auto-reply-enabled provider) still
-      // counts as "replied" here and won't be retried. Fixing this properly
-      // requires threading the dedup write into the async job itself for
-      // every async-dispatch reply type, which is out of scope for now.
+      // Dedup/count fire once dispatch is *enqueued*, so a second comment
+      // cannot trigger a duplicate while an async reply (flow, AIAgent, public
+      // text) is in flight. `verifyCommentAutomationReply` later removes the
+      // mark if that reply failed to reach the contact.
       if (!dispatchFailed) {
         await fbCommentAutomationService.insertDedup({
           automationId: automation.id,
@@ -355,6 +381,30 @@ export async function processCommentAutomation(
           willSendReply(automation.privateReply)
         ) {
           await fbCommentAutomationService.incrementRepliesCount(automation.id)
+        }
+
+        const deliverable = asyncDeliverable(automation)
+        if (deliverable) {
+          await integrationQueue.add(
+            IntegrationJobAction.verifyCommentAutomationReply,
+            {
+              type: IntegrationJobAction.verifyCommentAutomationReply,
+              data: {
+                workspaceId,
+                conversationId,
+                commentId,
+                automationId: automation.id,
+                contactId: contactInbox.contactId,
+                postId,
+                deliverable,
+                dispatchedAt: dispatchedAt.toISOString(),
+              },
+            },
+            {
+              delay: delay + VERIFY_REPLY_GRACE_MS,
+              jobId: `comment-verify-${commentId}-${automation.id}-${dispatchedAt.getTime()}`,
+            },
+          )
         }
       }
     } catch (err) {

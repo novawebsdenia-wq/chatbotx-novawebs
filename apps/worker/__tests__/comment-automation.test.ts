@@ -113,6 +113,7 @@ vi.mock("@chatbotx.io/worker-config", () => ({
   chatQueue: { add: mockChatQueueAdd },
   IntegrationJobAction: {
     processCommentAutomation: "processCommentAutomation",
+    verifyCommentAutomationReply: "verifyCommentAutomationReply",
     commentAIReply: "commentAIReply",
     sendFlow: "sendFlow",
   },
@@ -171,6 +172,7 @@ const STORY_ID = "2357494887629356"
 const POST_ID = `${PAGE_ID}_${STORY_ID}`
 const COMMENT_ID = `${STORY_ID}_1544045903933592`
 const OTHER_COMMENT_ID = `${STORY_ID}_9999999999999999`
+const VERIFY_JOB_ID = /^comment-verify-/
 
 type AutomationOverrides = {
   id?: string
@@ -777,6 +779,80 @@ describe("processCommentAutomation flow public reply", () => {
       }),
       expect.anything(),
     )
+  })
+})
+
+describe("processCommentAutomation delivery verification", () => {
+  const verifyCalls = () =>
+    mockIntegrationQueueAdd.mock.calls.filter(
+      ([name]) => name === "verifyCommentAutomationReply",
+    )
+
+  test("a flow DM queues a delayed check on the private reply", async () => {
+    mockFindActiveAutomations.mockResolvedValue([
+      buildAutomation({
+        publicReply: { type: "text", value: "Te lo mando por privado" },
+        privateReply: { type: "flow", value: "flow-1" },
+      }),
+    ])
+
+    await processCommentAutomation(buildJobData() as any)
+
+    expect(mockInsertDedup).toHaveBeenCalledTimes(1)
+    expect(verifyCalls()).toHaveLength(1)
+    const [, job, opts] = verifyCalls()[0] ?? []
+    expect(job).toEqual({
+      type: "verifyCommentAutomationReply",
+      data: expect.objectContaining({
+        automationId: "automation-1",
+        contactId: "contact-1",
+        postId: POST_ID,
+        commentId: COMMENT_ID,
+        conversationId: "conversation-1",
+        deliverable: "private",
+      }),
+    })
+    expect(opts).toEqual(
+      expect.objectContaining({
+        delay: 120_000,
+        jobId: expect.stringMatching(VERIFY_JOB_ID),
+      }),
+    )
+  })
+
+  test("a public-only automation checks the public reply", async () => {
+    mockFindActiveAutomations.mockResolvedValue([
+      buildAutomation({ publicReply: { type: "text", value: "Gracias" } }),
+    ])
+
+    await processCommentAutomation(buildJobData() as any)
+
+    const [, job] = verifyCalls()[0] ?? []
+    expect(job).toEqual(
+      expect.objectContaining({
+        data: expect.objectContaining({ deliverable: "public" }),
+      }),
+    )
+  })
+
+  test("a text DM is sent inline, so no later check is queued", async () => {
+    mockFindActiveAutomations.mockResolvedValue([
+      buildAutomation({ privateReply: { type: "text", value: "Hola" } }),
+    ])
+    mockSendPrivateReply.mockResolvedValue(undefined)
+
+    await processCommentAutomation(buildJobData() as any)
+
+    expect(mockInsertDedup).toHaveBeenCalledTimes(1)
+    expect(verifyCalls()).toHaveLength(0)
+  })
+
+  test("nothing to send means nothing to check", async () => {
+    mockFindActiveAutomations.mockResolvedValue([buildAutomation()])
+
+    await processCommentAutomation(buildJobData() as any)
+
+    expect(verifyCalls()).toHaveLength(0)
   })
 })
 
