@@ -72,6 +72,19 @@ class InstagramIntegrationService extends BaseService {
     })
   }
 
+  /**
+   * Which login an Instagram account was connected with: `instagram`
+   * (Instagram Login) or `facebook` (Facebook Login). `undefined` when the
+   * account is not connected.
+   */
+  async findLoginTypeByIgId(igId: string) {
+    const row = await db.query.integrationInstagramModel.findFirst({
+      where: { igId },
+      columns: { type: true },
+    })
+    return row?.type
+  }
+
   findByIdForWorkspace(props: { id: string; workspaceId: string }) {
     return db.query.integrationInstagramModel.findFirst({
       where: { id: props.id, workspaceId: props.workspaceId },
