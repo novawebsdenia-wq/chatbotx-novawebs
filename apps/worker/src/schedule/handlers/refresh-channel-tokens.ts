@@ -6,6 +6,7 @@ import { refreshMessengerTokens } from "./refresh-messenger-tokens"
 import { refreshTiktokTokens } from "./refresh-tiktok-tokens"
 import { refreshWhatsappTokens } from "./refresh-whatsapp-tokens"
 import { refreshZaloTokens } from "./refresh-zalo-tokens"
+import { summarizeRefreshError } from "./token-refresh-failure"
 
 async function refreshInstagramAndFacebookTokens(): Promise<void> {
   await Promise.all([
@@ -42,7 +43,10 @@ export async function refreshChannelTokens(
   const results = await Promise.allSettled(
     entries.map(([channel, refresh]) =>
       refresh().catch((error) => {
-        logger.error(error, `[refreshChannelTokens] channel=${channel} failed`)
+        logger.error(
+          { channel, ...summarizeRefreshError(error) },
+          `[refreshChannelTokens] channel=${channel} failed`,
+        )
         throw error
       }),
     ),

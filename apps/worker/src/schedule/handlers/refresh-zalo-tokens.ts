@@ -8,8 +8,12 @@ import {
 import { distributedLock } from "@chatbotx.io/redis"
 import { logger } from "../../lib/logger"
 import { runJobWithAuditContext } from "../../lib/run-job-with-audit-context"
+import {
+  recordTokenRefreshFailure,
+  refreshInBatches,
+  summarizeRefreshError,
+} from "./token-refresh-failure"
 
-const BATCH_SIZE = 50
 const REFRESH_SOURCE = "schedule:refreshChannelTokens"
 // Must outlive the OAuth client's 30s HTTP timeout: the Zalo refresh token is
 // single-use, so if the lock expired mid-call another process could consume
@@ -34,7 +38,7 @@ async function refreshOne(integration: {
           // redis hiccup) must not reject the whole batch and abort the
           // remaining integrations for the day.
           logger.error(
-            error,
+            { integrationId: integration.id, ...summarizeRefreshError(error) },
             `[refreshZaloTokens] id=${integration.id} lock failed`,
           )
         }),
@@ -77,19 +81,18 @@ async function refreshWithLockHeld(integration: {
       source: REFRESH_SOURCE,
     })
   } catch (error) {
-    logger.error(error, `[refreshZaloTokens] id=${integration.id} failed`)
-    await zaloIntegrationService.markTokenRefreshError(
-      integration.id,
-      error instanceof Error ? error.message : String(error),
-    )
+    await recordTokenRefreshFailure({
+      tag: "refreshZaloTokens",
+      integrationId: integration.id,
+      error,
+      markTokenRefreshError: (id, message) =>
+        zaloIntegrationService.markTokenRefreshError(id, message),
+    })
   }
 }
 
 export async function refreshZaloTokens(): Promise<void> {
   const integrations = await zaloIntegrationService.findAll()
 
-  for (let i = 0; i < integrations.length; i += BATCH_SIZE) {
-    const batch = integrations.slice(i, i + BATCH_SIZE)
-    await Promise.all(batch.map(refreshOne))
-  }
+  await refreshInBatches("refreshZaloTokens", integrations, refreshOne)
 }

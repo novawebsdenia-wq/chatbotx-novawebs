@@ -7,8 +7,11 @@ import {
 import { distributedLock } from "@chatbotx.io/redis"
 import { logger } from "../../lib/logger"
 import { runJobWithAuditContext } from "../../lib/run-job-with-audit-context"
+import {
+  recordTokenRefreshFailure,
+  refreshInBatches,
+} from "./token-refresh-failure"
 
-const BATCH_SIZE = 50
 const REFRESH_LOCK_TIMEOUT_SECONDS = 10
 const REFRESH_SOURCE = "schedule:refreshChannelTokens"
 
@@ -55,14 +58,13 @@ async function refreshOne(integration: {
               source: REFRESH_SOURCE,
             })
           } catch (error) {
-            logger.error(
+            await recordTokenRefreshFailure({
+              tag: "refreshInstagramFacebookTokens",
+              integrationId: integration.id,
               error,
-              `[refreshInstagramFacebookTokens] id=${integration.id} failed`,
-            )
-            await instagramIntegrationService.markTokenRefreshError(
-              integration.id,
-              error instanceof Error ? error.message : String(error),
-            )
+              markTokenRefreshError: (id, message) =>
+                instagramIntegrationService.markTokenRefreshError(id, message),
+            })
           }
         },
       }),
@@ -80,8 +82,9 @@ export async function refreshInstagramFacebookTokens(): Promise<void> {
   const integrations =
     await instagramIntegrationService.findFacebookForTokenRefresh()
 
-  for (let i = 0; i < integrations.length; i += BATCH_SIZE) {
-    const batch = integrations.slice(i, i + BATCH_SIZE)
-    await Promise.all(batch.map(refreshOne))
-  }
+  await refreshInBatches(
+    "refreshInstagramFacebookTokens",
+    integrations,
+    refreshOne,
+  )
 }
