@@ -7,8 +7,11 @@ import {
 import { distributedLock } from "@chatbotx.io/redis"
 import { logger } from "../../lib/logger"
 import { runJobWithAuditContext } from "../../lib/run-job-with-audit-context"
+import {
+  recordTokenRefreshFailure,
+  refreshInBatches,
+} from "./token-refresh-failure"
 
-const BATCH_SIZE = 50
 const REFRESH_LOCK_TIMEOUT_SECONDS = 10
 const REFRESH_SOURCE = "schedule:refreshChannelTokens"
 
@@ -57,14 +60,13 @@ async function refreshOne(integration: {
               source: REFRESH_SOURCE,
             })
           } catch (error) {
-            logger.error(
+            await recordTokenRefreshFailure({
+              tag: "refreshWhatsappTokens",
+              integrationId: integration.id,
               error,
-              `[refreshWhatsappTokens] id=${integration.id} failed`,
-            )
-            await integrationWhatsappService.markTokenRefreshError(
-              integration.id,
-              error instanceof Error ? error.message : String(error),
-            )
+              markTokenRefreshError: (id, message) =>
+                integrationWhatsappService.markTokenRefreshError(id, message),
+            })
           }
         },
       }),
@@ -79,8 +81,5 @@ export async function refreshWhatsappTokens(): Promise<void> {
 
   const integrations = await integrationWhatsappService.findAllForTokenRefresh()
 
-  for (let i = 0; i < integrations.length; i += BATCH_SIZE) {
-    const batch = integrations.slice(i, i + BATCH_SIZE)
-    await Promise.all(batch.map(refreshOne))
-  }
+  await refreshInBatches("refreshWhatsappTokens", integrations, refreshOne)
 }
