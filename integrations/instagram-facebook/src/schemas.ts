@@ -42,6 +42,7 @@ const attachmentTypeSchema = z
     "sticker",
     "location",
     "share",
+    "ig_post",
     "fallback",
     "story_mention",
     "ig_reel",
@@ -53,6 +54,15 @@ const attachmentTypeSchema = z
 // Base attachment payload — url optional because location/share have no url
 const baseAttachmentPayloadSchema = z.object({
   url: z.url().optional(),
+  // Post and reel shares carry their media id and caption next to the url (since
+  // Feb 2026 post shares arrive as `ig_post`). `.catch` so an unexpected value
+  // drops only that field, never the whole webhook batch.
+  title: z.string().optional().catch(undefined),
+  ig_post_media_id: z
+    .union([z.string(), z.number()])
+    .optional()
+    .catch(undefined),
+  reel_video_id: z.union([z.string(), z.number()]).optional().catch(undefined),
 })
 
 // Common ID schemas
