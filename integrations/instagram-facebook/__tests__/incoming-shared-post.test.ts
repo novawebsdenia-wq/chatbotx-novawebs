@@ -1,10 +1,10 @@
-import { HttpResponse, http, server } from "@chatbotx.io/vitest-config/msw"
 import { beforeEach, describe, expect, test, vi } from "vitest"
 import { receiveMessage } from "../src/handlers/message/incoming-message"
 
 const POST_URL =
   "https://lookaside.fbsbx.com/ig_messaging_cdn/?asset_id=18139494541428835&signature=abc"
-const REEL_URL = "https://reel.cdn.test/reel.mp4"
+// What Meta really sends for a reel share (15 Nov 2026): its public permalink
+const REEL_URL = "https://www.instagram.com/reel/DeK1Kwvs9YO/"
 
 const putObject = vi.fn(async () => undefined)
 
@@ -90,18 +90,7 @@ describe("instagram-facebook incoming shared posts and reels", () => {
     expect(attributes.shares).toHaveLength(1)
   })
 
-  test("still downloads a shared reel and also keeps its metadata", async () => {
-    server.use(
-      http.get(
-        REEL_URL,
-        () =>
-          new HttpResponse(new Uint8Array([1, 2, 3, 4]), {
-            headers: { "content-type": "video/mp4" },
-            status: 200,
-          }),
-      ),
-    )
-
+  test("keeps a shared reel as metadata instead of downloading its page", async () => {
     const result = await receive({
       attachments: [
         {
@@ -111,9 +100,8 @@ describe("instagram-facebook incoming shared posts and reels", () => {
       ],
     })
 
-    expect(result?.message?.attachments).toEqual([
-      expect.objectContaining({ fileType: "video", mimeType: "video/mp4" }),
-    ])
+    expect(putObject).not.toHaveBeenCalled()
+    expect(result?.message?.attachments).toEqual([])
     expect(result?.message?.contentAttributes).toEqual({
       type: "instagram_share",
       shares: [
