@@ -23,7 +23,25 @@ function normalizePostId(id: string): string {
   return idx === -1 ? id : id.slice(idx + 1)
 }
 
-export function matchPost(post: FBCommentPost, postId: string): boolean {
+/** True unless the automation is limited (`igIds`) to other accounts. */
+export function matchAccount(
+  igIds: string[] | undefined,
+  accountId: string | undefined,
+): boolean {
+  if (!igIds?.length) {
+    return true
+  }
+  return accountId !== undefined && igIds.includes(accountId)
+}
+
+export function matchPost(
+  post: FBCommentPost,
+  postId: string,
+  accountId?: string,
+): boolean {
+  if (!matchAccount(post.igIds, accountId)) {
+    return false
+  }
   if (post.type !== "postIds") {
     return true
   }

@@ -13,9 +13,15 @@ export const igCommentAutomationTypes = z.enum([
 ])
 export type IgCommentAutomationType = z.infer<typeof igCommentAutomationTypes>
 
+// Several Instagram accounts of the same channel type can share a workspace,
+// and automations are picked by workspace and channel type only. `igIds`
+// optionally limits the automation to comments received by those accounts.
+export const accountIdsSchema = z.array(z.string()).optional()
+
 export const fbCommentPostSchema = z.object({
   type: z.enum(["published", "ads", "reels", "postIds", "all"]),
   value: z.array(z.string()),
+  igIds: accountIdsSchema,
 })
 export type FBCommentPost = z.infer<typeof fbCommentPostSchema>
 
