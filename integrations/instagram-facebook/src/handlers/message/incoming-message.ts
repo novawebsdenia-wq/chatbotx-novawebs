@@ -14,11 +14,65 @@ import { getMessageAttachmentEntity } from "../../apis/page"
 import { InstagramException } from "../../exception"
 import { logger } from "../../lib/logger"
 import {
+  type InstagramAttachment,
   type InstagramAuthValue,
   type InstagramMessage,
   type InstagramMessagingEvent,
   instagramWebhookEventSchema,
 } from "../../schemas"
+
+/**
+ * Post and reel shares. A post share's url is a lookaside page, not a file:
+ * downloading it stored an empty `text/html` attachment, and the media id and
+ * caption were dropped. Post shares are now kept only as metadata in
+ * `contentAttributes`; reels still download (their url is the video) and also
+ * keep their metadata.
+ */
+const SHARE_TYPES = new Set<InstagramAttachment["type"]>([
+  "share",
+  "ig_post",
+  "ig_reel",
+  "reel",
+])
+const NOT_DOWNLOADABLE = new Set<InstagramAttachment["type"]>([
+  "share",
+  "ig_post",
+])
+
+const getSharedPosts = (message: InstagramMessage) => {
+  const seen = new Set<string>()
+  const shares: {
+    type: string
+    url?: string
+    title?: string
+    mediaId?: string
+  }[] = []
+  for (const attachment of message.attachments ?? []) {
+    if (!SHARE_TYPES.has(attachment.type)) {
+      continue
+    }
+    const { url, title, ig_post_media_id, reel_video_id } = attachment.payload
+    const rawMediaId = ig_post_media_id ?? reel_video_id
+    const mediaId = rawMediaId == null ? undefined : String(rawMediaId)
+    // During Meta's share -> ig_post transition the same post arrived twice
+    const key = mediaId ?? url
+    if (!key || seen.has(key)) {
+      continue
+    }
+    seen.add(key)
+    shares.push({ type: attachment.type, url, title, mediaId })
+  }
+  return shares
+}
+
+const getContentAttributes = (message: InstagramMessage) => {
+  const storyReply = message.reply_to?.story
+  if (storyReply) {
+    return { type: "story_reply", story: storyReply }
+  }
+  const shares = getSharedPosts(message)
+  return shares.length > 0 ? { type: "instagram_share", shares } : undefined
+}
 
 const getMessageAttachments = async (
   ctx: Context<InstagramAuthValue>,
@@ -30,7 +84,10 @@ const getMessageAttachments = async (
 
   try {
     const attachmentPromises = message.attachments
-      .filter((attachment) => attachment.payload.url)
+      .filter(
+        (attachment) =>
+          attachment.payload.url && !NOT_DOWNLOADABLE.has(attachment.type),
+      )
       .map((attachment) =>
         getMessageAttachmentEntity({ ctx, attachment }).catch((error) => {
           logger.error("Error processing attachment", error)
@@ -98,7 +155,6 @@ const getMessageEntity = async (
   }
 
   if (messaging.message) {
-    const storyReply = messaging.message.reply_to?.story
     message = {
       sourceId: messaging.message.mid,
       messageType:
@@ -107,9 +163,7 @@ const getMessageEntity = async (
           : messageTypes.enum.incoming,
       text: messaging.message.text,
       contentType: contentTypes.enum.text,
-      contentAttributes: storyReply
-        ? { type: "story_reply", story: storyReply }
-        : undefined,
+      contentAttributes: getContentAttributes(messaging.message),
       attachments: await getMessageAttachments(ctx, messaging.message),
     }
     quickReplyAction = messaging.message.quick_reply?.payload ?? null
