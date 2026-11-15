@@ -119,7 +119,7 @@ export async function processCommentAutomation(
         automation,
         workspace.timezone,
       ) &&
-      matchPost(automation.post, postId) &&
+      matchPost(automation.post, postId, integrationIdentifier) &&
       !(automation.options.ignoreCommentReplies && isReply) &&
       matchKeywords(
         automation.includeKeywords,
@@ -145,7 +145,7 @@ export async function processCommentAutomation(
         })
         continue
       }
-      if (!matchPost(automation.post, postId)) {
+      if (!matchPost(automation.post, postId, integrationIdentifier)) {
         logAutomationSkipped({
           automationId: automation.id,
           commentId,

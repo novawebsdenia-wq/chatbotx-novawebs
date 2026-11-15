@@ -3,6 +3,7 @@ import {
   contactInboxService,
   fbCommentAutomationService,
   igStoryAutomationService,
+  instagramIntegrationService,
   workspaceService,
 } from "@chatbotx.io/business"
 import type {
@@ -24,8 +25,16 @@ import {
 } from "@chatbotx.io/worker-config"
 import { logger } from "../../../lib/logger"
 import { generateAIReplyText } from "../automated-response/replies"
+import { matchAccount } from "../comment-automation/automation-matching"
 
-function matchStory(story: IgStoryTarget, storyId: string): boolean {
+function matchStory(
+  story: IgStoryTarget,
+  storyId: string,
+  accountId: string | undefined,
+): boolean {
+  if (!matchAccount(story.igIds, accountId)) {
+    return false
+  }
   if (story.type !== "storyIds") {
     return true
   }
@@ -158,6 +167,12 @@ export async function processStoryReplyAutomation(
     }),
     workspaceService.findById({ id: workspaceId }),
   ])
+  // The account that got the reply, only needed when an automation is limited
+  // to some accounts (`story.igIds`): the job carries the inbox, not the igId.
+  const accountId = automations.some((a) => a.story.igIds?.length)
+    ? (await instagramIntegrationService.findByInboxId(contactInbox.inboxId))
+        .igId
+    : undefined
 
   for (const automation of automations) {
     try {
@@ -177,7 +192,7 @@ export async function processStoryReplyAutomation(
         continue
       }
 
-      if (!matchStory(automation.story, storyId)) {
+      if (!matchStory(automation.story, storyId, accountId)) {
         logAutomationSkipped({
           automationId: automation.id,
           messageId,

@@ -178,7 +178,7 @@ type AutomationOverrides = {
   id?: string
   includeKeywords?: { type: string; value: string[] }
   options?: Record<string, boolean>
-  post?: { type: string; value: string[] }
+  post?: { type: string; value: string[]; igIds?: string[] }
   publicReply?: { type: string; value: string | null }
   privateReply?: { type: string; value: string | null }
   hideComments?: Record<string, unknown>
@@ -367,6 +367,34 @@ describe("processCommentAutomation matchPost normalization", () => {
       expect.objectContaining({ reason: "post does not match" }),
       "Comment automation skipped",
     )
+  })
+})
+
+describe("processCommentAutomation account limit (post.igIds)", () => {
+  test("skips an automation limited to another account", async () => {
+    mockFindActiveAutomations.mockResolvedValue([
+      buildAutomation({
+        post: { type: "all", value: [], igIds: ["other-ig"] },
+      }),
+    ])
+
+    await processCommentAutomation(buildJobData() as any)
+
+    expect(mockInsertDedup).not.toHaveBeenCalled()
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "post does not match" }),
+      "Comment automation skipped",
+    )
+  })
+
+  test("answers when the receiving account is in the list", async () => {
+    mockFindActiveAutomations.mockResolvedValue([
+      buildAutomation({ post: { type: "all", value: [], igIds: [PAGE_ID] } }),
+    ])
+
+    await processCommentAutomation(buildJobData() as any)
+
+    expect(mockInsertDedup).toHaveBeenCalled()
   })
 })
 

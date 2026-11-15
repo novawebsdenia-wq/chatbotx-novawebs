@@ -18,6 +18,7 @@ const {
   mockContactVariableReplaceAll,
   mockLoggerInfo,
   mockLoggerWarn,
+  mockFindIntegrationByInboxId,
 } = vi.hoisted(() => ({
   mockFindContactInboxBy: vi.fn(),
   mockFindActiveAutomations: vi.fn(),
@@ -32,6 +33,7 @@ const {
   mockContactVariableReplaceAll: vi.fn(),
   mockLoggerInfo: vi.fn(),
   mockLoggerWarn: vi.fn(),
+  mockFindIntegrationByInboxId: vi.fn(),
 }))
 
 vi.mock("@chatbotx.io/business", () => ({
@@ -43,6 +45,7 @@ vi.mock("@chatbotx.io/business", () => ({
     incrementRepliesCount: mockIncrementRepliesCount,
   },
   workspaceService: { findById: mockWorkspaceFindById },
+  instagramIntegrationService: { findByInboxId: mockFindIntegrationByInboxId },
 }))
 
 vi.mock("@chatbotx.io/variables", () => ({
@@ -91,10 +94,16 @@ const { processStoryReplyAutomation } = await import(
 const STORY_ID = "2357494887629356"
 const MESSAGE_ID = "message-1"
 
-function buildAutomation(reply: { type: string; value: string | null }) {
+function buildAutomation(
+  reply: { type: string; value: string | null },
+  story: { type: string; value: string[]; igIds?: string[] } = {
+    type: "all",
+    value: [],
+  },
+) {
   return {
     id: "automation-1",
-    story: { type: "all", value: [] },
+    story,
     includeKeywords: { type: "all", value: [] },
     reply,
   }
@@ -188,5 +197,56 @@ describe("processStoryReplyAutomation text reply variable resolution", () => {
       }),
     )
     expect(mockIncrementRepliesCount).toHaveBeenCalledWith("automation-1")
+  })
+})
+
+describe("processStoryReplyAutomation account limit (story.igIds)", () => {
+  const reply = { type: "text", value: "Thanks!" }
+
+  beforeEach(() => {
+    mockFindContactInboxBy.mockResolvedValue({
+      id: "contact-inbox-1",
+      contactId: "contact-1",
+      inboxId: "inbox-dario",
+    })
+    mockFindIntegrationByInboxId.mockResolvedValue({ igId: "ig-dario" })
+  })
+
+  test("skips an automation limited to another account", async () => {
+    mockFindActiveAutomations.mockResolvedValue([
+      buildAutomation(reply, {
+        type: "all",
+        value: [],
+        igIds: ["ig-novawebs"],
+      }),
+    ])
+
+    await processStoryReplyAutomation(buildJobData() as any)
+
+    expect(mockFindIntegrationByInboxId).toHaveBeenCalledWith("inbox-dario")
+    expect(mockChatQueueAdd).not.toHaveBeenCalled()
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ reason: "story does not match" }),
+      "Story reply automation skipped",
+    )
+  })
+
+  test("answers when the account is in the list", async () => {
+    mockFindActiveAutomations.mockResolvedValue([
+      buildAutomation(reply, { type: "all", value: [], igIds: ["ig-dario"] }),
+    ])
+
+    await processStoryReplyAutomation(buildJobData() as any)
+
+    expect(mockChatQueueAdd).toHaveBeenCalled()
+  })
+
+  test("does not look the account up when no automation is limited", async () => {
+    mockFindActiveAutomations.mockResolvedValue([buildAutomation(reply)])
+
+    await processStoryReplyAutomation(buildJobData() as any)
+
+    expect(mockFindIntegrationByInboxId).not.toHaveBeenCalled()
+    expect(mockChatQueueAdd).toHaveBeenCalled()
   })
 })
