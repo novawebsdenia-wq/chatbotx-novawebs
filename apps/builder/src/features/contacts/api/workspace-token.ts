@@ -1,6 +1,7 @@
 import {
   automatedResponseService,
   contactCustomFieldService,
+  contactInboxService,
   contactService,
   conversationService,
   tagService,
@@ -459,6 +460,7 @@ export const workspaceTokenAuthAPIs = {
         identifier: z.string().min(1),
         perPage: z.coerce.number().optional().default(20),
         cursor: z.string().optional(),
+        inboxId: z.string().regex(/^\d+$/).optional(),
       }),
     )
     .output(listMessagesResponse)
@@ -467,16 +469,21 @@ export const workspaceTokenAuthAPIs = {
         identifier: input.identifier,
         workspaceId: context.workspace.id,
       })
-      const conversation = await conversationService.findByContactWithInboxes({
-        contactId,
-        workspaceId: context.workspace.id,
-      })
-      if (!conversation) {
+      // A contact gets one conversation per comment thread plus its DM one, all
+      // on the same contact-inbox. Listing one conversation (findFirst, no
+      // order) often returned the oldest, so the newest DMs never showed up:
+      // list by contact-inbox, which spans all of them in time order.
+      const contactInbox = input.inboxId
+        ? (await contactInboxService.listByContactId({ contactId })).find(
+            (ci) => String(ci.inboxId) === input.inboxId,
+          )
+        : await contactInboxService.findRecentByContactId({ contactId })
+      if (!contactInbox) {
         throw notFoundException("Conversation not found")
       }
       return await listMessages({
         workspaceId: context.workspace.id,
-        conversationId: conversation.id,
+        contactInboxId: contactInbox.id,
         perPage: input.perPage,
         cursor: input.cursor,
       })

@@ -107,8 +107,10 @@ export const instagramMessageSchema = z.object({
 })
 export type InstagramMessage = z.infer<typeof instagramMessageSchema>
 
+// Instagram read events carry only `mid`: a required watermark made the whole
+// webhook batch fail to parse and be skipped.
 export const instagramReadSchema = z.object({
-  watermark: z.number(),
+  watermark: z.number().optional(),
 })
 
 export const instagramReferralSchema = z.object({

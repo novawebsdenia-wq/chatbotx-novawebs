@@ -22,21 +22,16 @@ import {
 } from "../../schemas"
 
 /**
- * Post and reel shares. A post share's url is a lookaside page, not a file:
- * downloading it stored an empty `text/html` attachment, and the media id and
- * caption were dropped. Post shares are now kept only as metadata in
- * `contentAttributes`; reels still download (their url is the video) and also
- * keep their metadata.
+ * Post and reel shares. Their url is a page, not a file (a post share points
+ * to lookaside, a reel share to its instagram.com/reel/ permalink, seen on
+ * 15 Nov 2026): downloading it stored an empty `text/html` attachment. Shares
+ * are kept only as metadata in `contentAttributes`.
  */
 const SHARE_TYPES = new Set<InstagramAttachment["type"]>([
   "share",
   "ig_post",
   "ig_reel",
   "reel",
-])
-const NOT_DOWNLOADABLE = new Set<InstagramAttachment["type"]>([
-  "share",
-  "ig_post",
 ])
 
 const getSharedPosts = (message: InstagramMessage) => {
@@ -89,7 +84,7 @@ const getMessageAttachments = async (
     const seenUrls = new Set<string>()
     const uniqueAttachments = message.attachments.filter((attachment) => {
       const url = attachment.payload.url
-      if (!url || seenUrls.has(url) || NOT_DOWNLOADABLE.has(attachment.type)) {
+      if (!url || seenUrls.has(url) || SHARE_TYPES.has(attachment.type)) {
         return false
       }
       seenUrls.add(url)
