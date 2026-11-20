@@ -46,6 +46,7 @@ import {
 import { emit } from "@chatbotx.io/event-bus"
 import {
   emitContactCreated,
+  emitMessageReceived,
   setWebhookExecutionContext,
 } from "@chatbotx.io/events"
 import { messageEventTypeSchema } from "@chatbotx.io/flow-config"
@@ -90,6 +91,7 @@ import {
   isInstagramViaFacebook,
 } from "../../services/integrations"
 import { resolvePostbackButtonLabel, sanitizeFlowAction } from "./flow-action"
+import { getMessagePreview } from "./message-preview"
 
 type ContactInboxTracking = ContactInboxTrackingData
 
@@ -123,6 +125,13 @@ const correctStoryReplyDirectionForNewContact = (
 // `SENT_FROM_CHATBOTX` metadata and are dropped by the webhook, so an echo
 // that reaches this point was written by a human in the native app.
 const HUMAN_ECHO_PAUSE_INTEGRATIONS = new Set<string>([
+  "instagram",
+  "messenger",
+])
+
+// Channels whose inbound DMs fire the `messageReceived` webhook. `instagram`
+// covers both logins: the Facebook-login variant arrives with this same type.
+const MESSAGE_RECEIVED_WEBHOOK_INTEGRATIONS = new Set<string>([
   "instagram",
   "messenger",
 ])
@@ -347,6 +356,24 @@ export const receiveMessage = async (
 
     if (isNewMessage) {
       createdMessage = newMessage
+
+      // Every new row the contact authored in the DM counts, button taps and
+      // story replies included: they show in the thread like any other
+      // message. Echoes and our own sends are stored as user rows.
+      if (
+        MESSAGE_RECEIVED_WEBHOOK_INTEGRATIONS.has(integrationType) &&
+        newMessage.messageType === messageTypes.enum.incoming &&
+        newMessage.senderType === "contact" &&
+        (incomingMessage.type ?? "message") === "message"
+      ) {
+        await emitMessageReceived(inbox.workspaceId, contactInbox.contactId, {
+          conversationId: conversation.id,
+          inboxId: inbox.id,
+          channel: inbox.channel,
+          messageId: newMessage.id,
+          text: getMessagePreview(incomingMessage),
+        })
+      }
 
       if (
         incomingMessage.messageType === messageTypes.enum.outgoing &&

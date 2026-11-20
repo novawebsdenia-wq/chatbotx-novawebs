@@ -5,6 +5,15 @@ import {
 } from "@chatbotx.io/database/partials"
 import { withContactInboxMetadata } from "./contact-inbox-context"
 
+export type ReceivedMessageEventData = {
+  conversationId: string
+  inboxId: string
+  channel: string
+  messageId: string
+  // Already shortened, or a placeholder such as "[imagen]" when there is no text
+  text: string
+}
+
 /**
  * Base event emitter class with common functionality
  */
@@ -157,6 +166,18 @@ export abstract class BaseEventEmitter {
         conversationId,
         transferredBy,
       },
+    })
+  }
+
+  async messageReceived(
+    workspaceId: string,
+    contactId: string,
+    message: ReceivedMessageEventData,
+  ): Promise<void> {
+    await this.emit(triggerEventTypes.enum.messageReceived, {
+      workspaceId,
+      contactId,
+      metadata: { ...message },
     })
   }
 

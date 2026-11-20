@@ -4,7 +4,7 @@ import {
 } from "@chatbotx.io/business"
 import { db } from "@chatbotx.io/database/client"
 import { triggerEventTypes } from "@chatbotx.io/database/partials"
-import type { MatchableEventType } from "@chatbotx.io/events"
+import type { WebhookMatchableEventType } from "@chatbotx.io/events"
 import type { MatchableWebhookEventData, WebhookPayload } from "../types"
 
 type WebhookPayloadBase = {
@@ -43,7 +43,8 @@ const EVENT_NAMES = {
   [triggerEventTypes.enum.contactReferredExistingContact]:
     "contact_referred_existing_contact",
   [triggerEventTypes.enum.dateTimeBasedTrigger]: "datetime_based_trigger",
-} satisfies Record<MatchableEventType, string>
+  [triggerEventTypes.enum.messageReceived]: "message_received",
+} satisfies Record<WebhookMatchableEventType, string>
 
 async function buildTagPayload(
   basePayload: WebhookPayloadBase,
@@ -190,7 +191,17 @@ const PAYLOAD_BUILDERS = {
     ...basePayload,
     ...data,
   }),
-} satisfies Record<MatchableEventType, PayloadBuilder>
+  // Built from the event metadata alone: no database read for an event that
+  // fires on every inbound DM.
+  [triggerEventTypes.enum.messageReceived]: (basePayload, data) => ({
+    ...basePayload,
+    conversation_id: data.conversationId as string,
+    inbox_id: data.inboxId as string,
+    channel: data.channel as string,
+    message_id: data.messageId as string,
+    text: data.text as string,
+  }),
+} satisfies Record<WebhookMatchableEventType, PayloadBuilder>
 
 /**
  * Builds the request body for one event, independently of how many webhooks it

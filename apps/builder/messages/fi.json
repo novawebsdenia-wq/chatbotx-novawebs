@@ -3772,7 +3772,8 @@
       "productRemovedFromCart": "Tuote poistettu ostoskorista",
       "productOrdered": "Tuote tilattu",
       "contactReferredANewContact": "Yhteystieto suositteli uutta yhteystietoa",
-      "contactReferredExistingContact": "Yhteystieto suositteli olemassa olevaa yhteystietoa"
+      "contactReferredExistingContact": "Yhteystieto suositteli olemassa olevaa yhteystietoa",
+      "messageReceived": "Viesti vastaanotettu (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "Lisää tunniste",

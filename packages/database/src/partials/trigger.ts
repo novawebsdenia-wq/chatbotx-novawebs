@@ -59,5 +59,6 @@ export const triggerEventTypes = z.enum([
   "productOrdered",
   "contactReferredANewContact",
   "contactReferredExistingContact",
+  "messageReceived",
 ])
 export type TriggerEventType = z.infer<typeof triggerEventTypes>

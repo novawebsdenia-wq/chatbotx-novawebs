@@ -3772,7 +3772,8 @@
       "productRemovedFromCart": "تمت إزالة منتج من السلة",
       "productOrdered": "تم طلب منتج",
       "contactReferredANewContact": "أحالت جهة الاتصال جهة اتصال جديدة",
-      "contactReferredExistingContact": "أحالت جهة الاتصال جهة اتصال موجودة"
+      "contactReferredExistingContact": "أحالت جهة الاتصال جهة اتصال موجودة",
+      "messageReceived": "تم استلام رسالة (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "إضافة وسم",

@@ -3772,7 +3772,8 @@
       "productRemovedFromCart": "Product Removed desde Cart",
       "productOrdered": "Producto pedido",
       "contactReferredANewContact": "Contacto Referred un Nuevo Contacto",
-      "contactReferredExistingContact": "Contacto Referred Existing Contacto"
+      "contactReferredExistingContact": "Contacto Referred Existing Contacto",
+      "messageReceived": "Mensaje recibido (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "Añadir Etiqueta",

@@ -1,10 +1,8 @@
 import { workspaceService } from "@chatbotx.io/business"
 import { db } from "@chatbotx.io/database/client"
-import type { TriggerEventType } from "@chatbotx.io/database/partials"
 import type { WorkspaceModel } from "@chatbotx.io/database/types"
 import {
-  isMatchableEventType,
-  matchableConditionTypesFor,
+  isWebhookMatchableEventType,
   SCANNER_VERIFIED_EVENT_TYPES,
 } from "@chatbotx.io/events"
 import { logger } from "../../lib/logger"
@@ -21,13 +19,6 @@ const SCANNER_VERIFIED_EVENT_TYPE_SET: ReadonlySet<string> = new Set(
   SCANNER_VERIFIED_EVENT_TYPES,
 )
 
-function hasConditionType(
-  conditionTypes: readonly TriggerEventType[],
-  conditionType: string,
-): boolean {
-  return conditionTypes.some((type) => type === conditionType)
-}
-
 export class WebhookMatcherService {
   private readonly conditionEvaluator: ConditionEvaluator
   private readonly webhookExecutor: WebhookExecutor
@@ -40,11 +31,7 @@ export class WebhookMatcherService {
   async findAndExecuteWebhooks(eventData: WebhookEventData): Promise<void> {
     const { workspaceId, eventType, eventData: metadata } = eventData
 
-    const conditionTypes = matchableConditionTypesFor(eventType)
-    if (conditionTypes.length === 0) {
-      return
-    }
-    if (!isMatchableEventType(eventType)) {
+    if (!isWebhookMatchableEventType(eventType)) {
       return
     }
     const matchableEventData: MatchableWebhookEventData = {
@@ -68,8 +55,7 @@ export class WebhookMatcherService {
     const filteredWebhooks = webhooks.filter((webhook) =>
       webhook.conditions.some(
         (c) =>
-          hasConditionType(conditionTypes, c.type) &&
-          (sourceId ? c.sourceId === sourceId : true),
+          c.type === eventType && (sourceId ? c.sourceId === sourceId : true),
       ),
     )
 

@@ -3772,7 +3772,8 @@
       "productRemovedFromCart": "Produkt aus Warenkorb entfernt",
       "productOrdered": "Produkt bestellt",
       "contactReferredANewContact": "Kontakt hat einen neuen Kontakt geworben",
-      "contactReferredExistingContact": "Kontakt hat einen bestehenden Kontakt geworben"
+      "contactReferredExistingContact": "Kontakt hat einen bestehenden Kontakt geworben",
+      "messageReceived": "Nachricht empfangen (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "Tag hinzufügen",

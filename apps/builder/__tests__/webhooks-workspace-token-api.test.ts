@@ -10,6 +10,7 @@ type RouteConfig = {
 
 type CapturedProcedure = {
   route: RouteConfig
+  input?: { safeParse: (data: unknown) => { success: boolean } }
   handler?: (...args: any[]) => any
 }
 
@@ -21,7 +22,10 @@ const { workspaceTokenAuthAPI, capturedProcedures } = vi.hoisted(() => {
     capturedProcedures.push(record)
 
     const chain = {
-      input: vi.fn(() => chain),
+      input: vi.fn((schema: CapturedProcedure["input"]) => {
+        record.input = schema
+        return chain
+      }),
       output: vi.fn(() => chain),
       errors: vi.fn(() => chain),
       handler: vi.fn((fn: (...args: any[]) => any) => {
@@ -135,6 +139,46 @@ describe("POST /v1/webhooks", () => {
         },
       ],
     })
+  })
+})
+
+describe("POST /v1/webhooks — messageReceived", () => {
+  const procedure = findProcedure("POST", "/v1/webhooks")
+
+  test("accepts the simple messageReceived condition", () => {
+    expect(
+      procedure.input?.safeParse({
+        name: "Panel no leídos",
+        url: "https://n8n.example.com/webhook/dm",
+        conditions: [{ type: "messageReceived" }],
+      }).success,
+    ).toBe(true)
+  })
+
+  test("stores it as a condition without source, operator or value", async () => {
+    webhookService.register.mockResolvedValueOnce({ id: "webhook-1" })
+
+    await procedure.handler?.({
+      context: { workspace: { id: "workspace-1" } },
+      input: {
+        name: "Panel no leídos",
+        url: "https://n8n.example.com/webhook/dm",
+        conditions: [{ type: "messageReceived" }],
+      },
+    })
+
+    expect(webhookService.register).toHaveBeenCalledWith(
+      expect.objectContaining({
+        conditions: [
+          {
+            type: "messageReceived",
+            sourceId: null,
+            operator: null,
+            value: null,
+          },
+        ],
+      }),
+    )
   })
 })
 

@@ -8,7 +8,7 @@ import {
   possibleErrorsOnListingResource,
 } from "@/lib/orpc/orpc-error-helper"
 import { workspaceTokenAuthAPI } from "@/orpc"
-import { conditionSchema } from "../../conditions/schemas"
+import { webhookConditionSchema } from "../../conditions/schemas"
 import { toConditionColumns } from "../../conditions/to-condition-columns"
 
 const webhookResource = createSelectSchema(webhookModel, {
@@ -37,7 +37,7 @@ const createWebhookWorkspaceTokenAPI = workspaceTokenAuthAPI
     path: "/v1/webhooks",
     summary: "Register a webhook",
     description:
-      "Registers a URL to receive system events (e.g. new contact, tag applied). Automation platforms (e.g. n8n) can call this to auto-attach a webhook when a workflow is activated.",
+      "Registers a URL to receive system events (e.g. new contact, tag applied, message received). Automation platforms (e.g. n8n) can call this to auto-attach a webhook when a workflow is activated.",
     successStatus: 201,
     tags: ["Webhooks"],
   })
@@ -45,7 +45,7 @@ const createWebhookWorkspaceTokenAPI = workspaceTokenAuthAPI
     z.object({
       name: z.string().trim().min(1).max(255),
       url: z.string().trim().url().max(1000),
-      conditions: z.array(conditionSchema).min(1),
+      conditions: z.array(webhookConditionSchema).min(1),
     }),
   )
   .output(webhookResource)

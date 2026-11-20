@@ -2000,7 +2000,8 @@
       "productRemovedFromCart": "מוצר הוסר מהעגלה",
       "productOrdered": "מוצר הוזמן",
       "contactReferredANewContact": "איש קשר הפנה איש קשר חדש",
-      "contactReferredExistingContact": "איש קשר הפנה איש קשר קיים"
+      "contactReferredExistingContact": "איש קשר הפנה איש קשר קיים",
+      "messageReceived": "התקבלה הודעה (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "הוספת תגית",

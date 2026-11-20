@@ -3772,7 +3772,8 @@
       "productRemovedFromCart": "Produk Dihapus dari Keranjang",
       "productOrdered": "Produk Dipesan",
       "contactReferredANewContact": "Kontak Mereferensikan Kontak Baru",
-      "contactReferredExistingContact": "Kontak Mereferensikan Kontak yang Sudah Ada"
+      "contactReferredExistingContact": "Kontak Mereferensikan Kontak yang Sudah Ada",
+      "messageReceived": "Pesan diterima (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "Tambahkan Tag",

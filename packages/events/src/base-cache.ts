@@ -124,13 +124,17 @@ export abstract class BaseCache {
 
     if (!cached) {
       const chatbotMap = await this.buildCacheData(workspaceId)
+      const cacheKey = this.getCacheKey(workspaceId)
+      this.ramCache.set(cacheKey, { data: chatbotMap, timestamp: Date.now() })
 
+      // A workspace with nothing active is remembered in RAM only, for ramTTL:
+      // the same staleness a non-empty entry already has, and it spares a
+      // database read on every event (one per inbound DM for messageReceived).
+      // Redis is left empty so a write path that skips updateCache cannot
+      // leave it stale for the full redisTTL.
       if (Object.keys(chatbotMap).length === 0) {
         return false
       }
-
-      const cacheKey = this.getCacheKey(workspaceId)
-      this.ramCache.set(cacheKey, { data: chatbotMap, timestamp: Date.now() })
 
       try {
         const redis = getRedisConnection()

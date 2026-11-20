@@ -49,6 +49,7 @@ export class ConditionEvaluator {
       case triggerEventTypes.enum.unsubscribedFromSequence:
       case triggerEventTypes.enum.contactReferredANewContact:
       case triggerEventTypes.enum.contactReferredExistingContact:
+      case triggerEventTypes.enum.messageReceived:
         return true
 
       case triggerEventTypes.enum.dateTimeBasedTrigger:

@@ -3886,7 +3886,8 @@
       "productRemovedFromCart": "Product Removed From Cart",
       "productOrdered": "Product Ordered",
       "contactReferredANewContact": "Contact Referred A New Contact",
-      "contactReferredExistingContact": "Contact Referred Existing Contact"
+      "contactReferredExistingContact": "Contact Referred Existing Contact",
+      "messageReceived": "Message received (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "Add Tag",

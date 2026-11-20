@@ -3772,7 +3772,8 @@
       "productRemovedFromCart": "Product Removed Fra Cart",
       "productOrdered": "Product Ordered",
       "contactReferredANewContact": "Kontakt Referred A Ny Kontakt",
-      "contactReferredExistingContact": "Kontakt Referred Existing Kontakt"
+      "contactReferredExistingContact": "Kontakt Referred Existing Kontakt",
+      "messageReceived": "Besked modtaget (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "Tilføj tag",

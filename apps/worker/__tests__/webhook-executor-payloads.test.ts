@@ -1,5 +1,5 @@
 import { triggerEventTypes } from "@chatbotx.io/database/partials"
-import type { MatchableEventType } from "@chatbotx.io/events"
+import type { WebhookMatchableEventType } from "@chatbotx.io/events"
 import { beforeEach, describe, expect, test, vi } from "vitest"
 import type { WebhookWithConditions } from "../src/webhook/types"
 
@@ -62,7 +62,7 @@ const tagRows = [
 ]
 
 type PayloadCase = {
-  eventType: MatchableEventType
+  eventType: WebhookMatchableEventType
   metadata: Record<string, unknown>
   expectedPayload: Record<string, unknown>
 }
@@ -261,6 +261,24 @@ const payloadCases = [
       sourceId: "custom-field-1",
     },
   },
+  {
+    eventType: triggerEventTypes.enum.messageReceived,
+    metadata: {
+      conversationId: "conversation-1",
+      inboxId: "inbox-1",
+      channel: "instagram",
+      messageId: "message-1",
+      text: "¿Cuánto cuesta una web?",
+    },
+    expectedPayload: {
+      ...basePayload("message_received"),
+      conversation_id: "conversation-1",
+      inbox_id: "inbox-1",
+      channel: "instagram",
+      message_id: "message-1",
+      text: "¿Cuánto cuesta una web?",
+    },
+  },
 ] satisfies PayloadCase[]
 
 describe("WebhookExecutor payloads", () => {
@@ -333,6 +351,27 @@ describe("WebhookExecutor payloads", () => {
       timestamp,
       tag: "",
     })
+  })
+
+  // Fires on every inbound DM, so the payload must come from the event alone.
+  test("builds message_received without reading the database", async () => {
+    await buildWebhookPayload({
+      workspaceId: "workspace-1",
+      contactId: "contact-1",
+      eventType: triggerEventTypes.enum.messageReceived,
+      eventData: {
+        conversationId: "conversation-1",
+        inboxId: "inbox-1",
+        channel: "messenger",
+        messageId: "message-1",
+        text: "[imagen]",
+      },
+      timestamp,
+    })
+
+    expect(contactFindById).not.toHaveBeenCalled()
+    expect(listCustomFields).not.toHaveBeenCalled()
+    expect(tagFindFirst).not.toHaveBeenCalled()
   })
 
   // A contact deleted between the event and the delivery attempt must still

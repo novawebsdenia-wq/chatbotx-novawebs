@@ -4,6 +4,7 @@ import {
   triggerEventTypes,
 } from "@chatbotx.io/database/partials"
 import { describe, expect, test } from "vitest"
+import { conditionSchema, webhookConditionSchema } from "../schemas"
 import { customFieldValueChanged } from "../schemas/custom-field-value-changed"
 import { dateTimeBasedTrigger } from "../schemas/date-time-based-trigger"
 
@@ -74,5 +75,25 @@ describe("customFieldValueChanged schema timezone", () => {
     })
 
     expect(parsed.value).toEqual(value)
+  })
+})
+
+describe("messageReceived condition", () => {
+  test("webhooks accept it", () => {
+    expect(
+      webhookConditionSchema.safeParse({
+        type: triggerEventTypes.enum.messageReceived,
+      }).success,
+    ).toBe(true)
+  })
+
+  // The trigger emitter never fires it, so a trigger saved with it would
+  // silently never run.
+  test("triggers reject it", () => {
+    expect(
+      conditionSchema.safeParse({
+        type: triggerEventTypes.enum.messageReceived,
+      }).success,
+    ).toBe(false)
   })
 })

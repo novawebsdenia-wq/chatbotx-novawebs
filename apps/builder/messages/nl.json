@@ -3772,7 +3772,8 @@
       "productRemovedFromCart": "Product uit winkelwagen verwijderd",
       "productOrdered": "Product besteld",
       "contactReferredANewContact": "Contact heeft een nieuw contact doorverwezen",
-      "contactReferredExistingContact": "Contact heeft een bestaand contact doorverwezen"
+      "contactReferredExistingContact": "Contact heeft een bestaand contact doorverwezen",
+      "messageReceived": "Bericht ontvangen (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "Tag toevoegen",
