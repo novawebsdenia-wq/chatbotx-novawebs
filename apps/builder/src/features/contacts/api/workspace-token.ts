@@ -547,6 +547,7 @@ export const workspaceTokenAuthAPIs = {
       await disableBotForConversations({
         workspaceId: context.workspace.id,
         ids: [conversation.id],
+        transferredBy: "panel",
       })
       return toContactBotState(await findContactDMConversation(params))
     }),

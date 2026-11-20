@@ -879,6 +879,10 @@ class ConversationService extends BaseService {
     workspaceId: string
     conversations: { id: string; contactId: string }[]
     userId?: string
+    // Only for the transferred-to-human event. Without it (and without
+    // userId) the webhook reports `transferred_by: "bot"`, which is what the
+    // AI handoff sends — so callers that are not the bot must name themselves.
+    transferredBy?: string
     triggerContext: TriggerContext
     tx?: DatabaseClient
   }): Promise<void> {
@@ -894,7 +898,7 @@ class ConversationService extends BaseService {
         props.workspaceId,
         conv.contactId,
         conv.id,
-        props.userId,
+        props.transferredBy ?? props.userId,
       )
 
       emit("analytics:dashboard", {
@@ -934,6 +938,7 @@ class ConversationService extends BaseService {
       conversations: [
         { id: conversation.id, contactId: conversation.contactId },
       ],
+      transferredBy: "human_reply",
       triggerContext: props.triggerContext,
     })
     return true

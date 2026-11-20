@@ -14,6 +14,7 @@ export const disableBotForConversations = async (props: {
   workspaceId: string
   ids: string[]
   userId?: string
+  transferredBy?: string
 }) => {
   const conversations = await conversationService.findManyByIds({
     workspaceId: props.workspaceId,
@@ -24,6 +25,7 @@ export const disableBotForConversations = async (props: {
     workspaceId: props.workspaceId,
     conversations,
     userId: props.userId,
+    transferredBy: props.transferredBy,
     triggerContext: {
       triggerSource: "api",
       triggerHandler: "disableBotAction",

@@ -303,9 +303,12 @@ describe("estado del bot por contacto", () => {
       input: { identifier: "id:contact-1" },
     })
 
+    // "panel", not undefined: an empty transferredBy reaches the webhook as
+    // transferred_by "bot", the same as a real AI handoff to a person.
     expect(disableBotForConversations).toHaveBeenCalledWith({
       workspaceId: "ws-1",
       ids: ["conv-dm"],
+      transferredBy: "panel",
     })
   })
 

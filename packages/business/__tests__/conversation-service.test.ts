@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, test, vi } from "vitest"
 
 const {
+  emitTransferredToHuman,
   execute,
   invalidateCacheByTags,
   invalidateTracking,
@@ -14,6 +15,7 @@ const {
   const set = vi.fn(() => ({ where }))
   const update = vi.fn(() => ({ set }))
   return {
+    emitTransferredToHuman: vi.fn().mockResolvedValue(undefined),
     execute: vi.fn().mockResolvedValue(undefined),
     invalidateCacheByTags: vi.fn().mockResolvedValue(undefined),
     invalidateTracking: vi.fn().mockResolvedValue(undefined),
@@ -41,6 +43,14 @@ vi.mock("../src/contact-inbox/service", () => ({
     invalidateTracking,
     updateTracking,
   },
+}))
+vi.mock("@chatbotx.io/events", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@chatbotx.io/events")>()),
+  emitConversationTransferredToHuman: emitTransferredToHuman,
+}))
+vi.mock("@chatbotx.io/event-bus", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("@chatbotx.io/event-bus")>()),
+  emit: vi.fn(),
 }))
 vi.mock("@chatbotx.io/redis", () => ({
   invalidateCacheByTags,
@@ -389,6 +399,7 @@ describe("conversationService.pauseBotForHumanReply", () => {
     expect(disableBotState).toHaveBeenCalledWith({
       workspaceId: "ws-1",
       conversations: [{ id: "conv-1", contactId: "contact-1" }],
+      transferredBy: "human_reply",
       triggerContext,
     })
   })
@@ -446,5 +457,71 @@ describe("conversationService.pauseBotForHumanReply", () => {
     ).resolves.toBe(false)
 
     expect(disableBotState).not.toHaveBeenCalled()
+  })
+})
+
+describe("conversationService.disableBotState — transferred_by del webhook", () => {
+  const triggerContext = {
+    triggerSource: "api",
+    triggerHandler: "test",
+    triggerType: "conversation_transferred_to_human",
+  }
+
+  beforeEach(() => {
+    vi.restoreAllMocks()
+    vi.clearAllMocks()
+    vi.spyOn(conversationService, "updateBotEnabled").mockResolvedValue()
+  })
+
+  test("el eco de la app o la API (pauseBotForHumanReply) emite human_reply", async () => {
+    await conversationService.pauseBotForHumanReply({
+      conversation: {
+        id: "conv-1",
+        workspaceId: "ws-1",
+        contactId: "contact-1",
+        botEnabled: true,
+        botResumeAt: null,
+      },
+      triggerContext,
+    })
+
+    expect(emitTransferredToHuman).toHaveBeenCalledWith(
+      "ws-1",
+      "contact-1",
+      "conv-1",
+      "human_reply",
+    )
+  })
+
+  test("la pausa del panel emite panel", async () => {
+    await conversationService.disableBotState({
+      workspaceId: "ws-1",
+      conversations: [{ id: "conv-1", contactId: "contact-1" }],
+      transferredBy: "panel",
+      triggerContext,
+    })
+
+    expect(emitTransferredToHuman).toHaveBeenCalledWith(
+      "ws-1",
+      "contact-1",
+      "conv-1",
+      "panel",
+    )
+  })
+
+  test("sin transferredBy sigue emitiendo el usuario, como hasta ahora", async () => {
+    await conversationService.disableBotState({
+      workspaceId: "ws-1",
+      conversations: [{ id: "conv-1", contactId: "contact-1" }],
+      userId: "user-7",
+      triggerContext,
+    })
+
+    expect(emitTransferredToHuman).toHaveBeenCalledWith(
+      "ws-1",
+      "contact-1",
+      "conv-1",
+      "user-7",
+    )
   })
 })
