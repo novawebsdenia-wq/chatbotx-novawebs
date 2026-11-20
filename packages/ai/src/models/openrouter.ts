@@ -2,6 +2,7 @@ import { z } from "zod"
 import type { AiChatModelOption } from "./registry"
 
 export const openrouterModels = z.enum([
+  "openai/gpt-6-luna",
   "openai/gpt-5.5-pro",
   "openai/gpt-5.5",
   "openai/gpt-5.4-pro",
@@ -32,6 +33,7 @@ export const openrouterModels = z.enum([
   "anthropic/claude-haiku-4.5",
   "anthropic/claude-3-5-sonnet",
   "anthropic/claude-3-5-haiku",
+  "google/gemini-3.8-flash",
   "google/gemini-3.5-flash",
   "google/gemini-3.1-pro-preview",
   "google/gemini-3.1-flash-lite",
@@ -66,6 +68,7 @@ export const openrouterModels = z.enum([
 export type OpenRouterModel = z.infer<typeof openrouterModels>
 
 export const openrouterModelOptions: AiChatModelOption[] = [
+  { label: "GPT-6 Luna", value: "openai/gpt-6-luna" },
   { label: "GPT-5.5 Pro", value: "openai/gpt-5.5-pro" },
   { label: "GPT-5.5", value: "openai/gpt-5.5" },
   { label: "GPT-5.4 Pro", value: "openai/gpt-5.4-pro" },
@@ -84,6 +87,7 @@ export const openrouterModelOptions: AiChatModelOption[] = [
   { label: "Claude Sonnet 4.6", value: "anthropic/claude-sonnet-4.6" },
   { label: "Claude Sonnet 4.5", value: "anthropic/claude-sonnet-4.5" },
   { label: "Claude Haiku 4.5", value: "anthropic/claude-haiku-4.5" },
+  { label: "Gemini 3.8 Flash", value: "google/gemini-3.8-flash" },
   { label: "Gemini 3.5 Flash", value: "google/gemini-3.5-flash" },
   { label: "Gemini 3.1 Pro Preview", value: "google/gemini-3.1-pro-preview" },
   { label: "Gemini 3.1 Flash Lite", value: "google/gemini-3.1-flash-lite" },
