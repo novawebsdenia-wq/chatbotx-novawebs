@@ -3689,7 +3689,8 @@
       "productRemovedFromCart": "Sản phẩm xóa khỏi giỏ",
       "productOrdered": "Sản phẩm đã đặt",
       "contactReferredANewContact": "Liên hệ giới thiệu liên hệ mới",
-      "contactReferredExistingContact": "Liên hệ giới thiệu liên hệ hiện có"
+      "contactReferredExistingContact": "Liên hệ giới thiệu liên hệ hiện có",
+      "messageReceived": "Đã nhận tin nhắn (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "Thêm thẻ",

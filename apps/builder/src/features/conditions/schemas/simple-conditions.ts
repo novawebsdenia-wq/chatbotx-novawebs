@@ -39,6 +39,9 @@ export const contactReferredANewContact = createSimpleCondition(
 export const contactReferredExistingContact = createSimpleCondition(
   triggerEventTypes.enum.contactReferredExistingContact,
 )
+export const messageReceived = createSimpleCondition(
+  triggerEventTypes.enum.messageReceived,
+)
 
 // Conditions with sourceId
 const createConditionWithSourceId = (type: TriggerEventType) =>

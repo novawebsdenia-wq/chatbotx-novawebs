@@ -40,6 +40,7 @@ const {
   mockSyncScopedIdentity,
   mockIsUniqueViolationError,
   mockDetectFlowVersion,
+  mockEmitMessageReceived,
 } = vi.hoisted(() => {
   const mockDbSet = vi.fn()
   const updateChain = { set: mockDbSet, where: vi.fn() }
@@ -115,6 +116,7 @@ const {
     ),
     mockIsUniqueViolationError: vi.fn().mockReturnValue(false),
     mockDetectFlowVersion: vi.fn(),
+    mockEmitMessageReceived: vi.fn().mockResolvedValue(undefined),
   }
 })
 
@@ -213,6 +215,7 @@ vi.mock("@chatbotx.io/event-bus", () => ({
 
 vi.mock("@chatbotx.io/events", () => ({
   emitContactCreated: vi.fn().mockResolvedValue(undefined),
+  emitMessageReceived: mockEmitMessageReceived,
   setWebhookExecutionContext: vi.fn(),
 }))
 
@@ -2262,6 +2265,207 @@ describe("receiveMessage — pausa del bot cuando contesta un humano", () => {
     expect(logger.warn).toHaveBeenCalledWith(
       expect.objectContaining({ conversationId: "conv-1" }),
       "Pausing the bot after a human echo failed",
+    )
+  })
+})
+
+describe("receiveMessage — webhook de mensaje recibido", () => {
+  const incomingDm = {
+    message: { ...baseIncomingMessage, attachments: [] },
+    contact: { sourceId: "psid-123", firstName: "Test" },
+    postbackAction: null,
+    quickReplyAction: null,
+    ref: null,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockFindContactInbox.mockResolvedValue({
+      ...fakeContactInbox,
+      contact: fakeContact,
+    })
+    mockConversationFindOrCreate.mockResolvedValue(fakeConversation)
+    vi.mocked(
+      integrationService.identifyInboxAndIntegrationAuthFromIdentifier,
+    ).mockResolvedValue({
+      inbox: fakeInbox,
+      integrationRow: fakeIntegrationRow,
+    } as never)
+    mockBuildContext.mockResolvedValue({ workspaceId: "ws-1" })
+    mockresolveTenantSettings.mockResolvedValue({
+      storageUrl: "https://files.example.test",
+    })
+    mockCreateMessageRepository.mockResolvedValue({
+      createOrUpdate: mockCreateOrUpdate,
+      createOrUpdateWithAttachments: mockCreateOrUpdateWithAttachments,
+    })
+    mockCreateOrUpdate.mockResolvedValue({
+      message: fakeCreatedMessage,
+      isNew: true,
+    })
+    mockWorkspaceIsActiveNow.mockReturnValue(true)
+  })
+
+  test.each([
+    "instagram",
+    "messenger",
+  ])("un DM entrante de %s emite el evento con su payload", async (integrationType) => {
+    mockRunChannelHandler.mockResolvedValue(incomingDm)
+
+    await receiveMessage({ ...baseProps, integrationType })
+
+    expect(mockEmitMessageReceived).toHaveBeenCalledTimes(1)
+    expect(mockEmitMessageReceived).toHaveBeenCalledWith("ws-1", "contact-1", {
+      conversationId: "conv-1",
+      inboxId: "inbox-1",
+      channel: "messenger",
+      messageId: "msg-created",
+      text: "hello",
+    })
+  })
+
+  test("Instagram conectado con Facebook también emite", async () => {
+    const services = await import("../src/services/integrations")
+    vi.mocked(services.isInstagramViaFacebook).mockReturnValueOnce(true)
+    mockRunChannelHandler.mockResolvedValue(incomingDm)
+
+    await receiveMessage({ ...baseProps, integrationType: "instagram" })
+
+    expect(mockEmitMessageReceived).toHaveBeenCalledTimes(1)
+  })
+
+  test("un eco (mensaje enviado desde la app) no emite", async () => {
+    mockRunChannelHandler.mockResolvedValue({
+      ...incomingDm,
+      message: { ...incomingDm.message, messageType: "outgoing" },
+    })
+    mockCreateOrUpdate.mockResolvedValue({
+      message: {
+        ...fakeCreatedMessage,
+        messageType: "outgoing",
+        senderType: "user",
+      },
+      isNew: true,
+    })
+
+    await receiveMessage({ ...baseProps, integrationType: "instagram" })
+
+    expect(mockEmitMessageReceived).not.toHaveBeenCalled()
+  })
+
+  test("un mensaje saliente ya guardado por ChatbotX no emite", async () => {
+    mockRunChannelHandler.mockResolvedValue({
+      ...incomingDm,
+      message: { ...incomingDm.message, messageType: "outgoing" },
+    })
+    mockCreateOrUpdate.mockResolvedValue({
+      message: {
+        ...fakeCreatedMessage,
+        messageType: "outgoing",
+        senderType: "user",
+      },
+      isNew: false,
+    })
+
+    await receiveMessage({ ...baseProps, integrationType: "messenger" })
+
+    expect(mockEmitMessageReceived).not.toHaveBeenCalled()
+  })
+
+  test("un reintento de Meta del mismo mensaje no vuelve a emitir", async () => {
+    mockRunChannelHandler.mockResolvedValue(incomingDm)
+    mockCreateOrUpdate.mockResolvedValue({
+      message: fakeCreatedMessage,
+      isNew: false,
+    })
+
+    await receiveMessage({ ...baseProps, integrationType: "instagram" })
+
+    expect(mockEmitMessageReceived).not.toHaveBeenCalled()
+  })
+
+  test("los DM de otros canales (WhatsApp, Zalo) no emiten", async () => {
+    mockRunChannelHandler.mockResolvedValue(incomingDm)
+
+    await receiveMessage({ ...baseProps, integrationType: "whatsapp" })
+    await receiveMessage({ ...baseProps, integrationType: "zalo" })
+
+    expect(mockEmitMessageReceived).not.toHaveBeenCalled()
+  })
+
+  test.each([
+    [
+      "un clic en un botón",
+      { postbackAction: encodeButtonPayload({ flowId: "42" }) },
+    ],
+    [
+      "una respuesta rápida",
+      { quickReplyAction: encodeButtonPayload({ flowId: "42" }) },
+    ],
+    // A payload the flow engine rejects (another app, a native ice breaker) is still a tap
+    ["un clic con un payload ajeno", { postbackAction: "OTHER_APP_PAYLOAD" }],
+  ])("%s no emite", async (_, action) => {
+    mockRunChannelHandler.mockResolvedValue({
+      ...incomingDm,
+      message: { ...incomingDm.message, text: "Ver precios" },
+      ...action,
+    })
+
+    await receiveMessage({ ...baseProps, integrationType: "instagram" })
+
+    expect(mockEmitMessageReceived).not.toHaveBeenCalled()
+  })
+
+  test("un adjunto sin texto emite con su etiqueta", async () => {
+    mockRunChannelHandler.mockResolvedValue({
+      ...incomingDm,
+      message: {
+        ...incomingDm.message,
+        text: undefined,
+        attachments: [
+          {
+            sourceId: "att-1",
+            fileType: "audio",
+            mimeType: "audio/mp4",
+            originPath: "files/att-1",
+            size: 1,
+          },
+        ],
+      },
+    })
+    mockCreateOrUpdateWithAttachments.mockResolvedValue({
+      result: { ...fakeCreatedMessage, attachments: [] },
+      isNew: true,
+    })
+
+    await receiveMessage({ ...baseProps, integrationType: "messenger" })
+
+    expect(mockEmitMessageReceived).toHaveBeenCalledWith(
+      "ws-1",
+      "contact-1",
+      expect.objectContaining({ text: "[audio]" }),
+    )
+  })
+
+  test("una respuesta a una historia sin texto emite con su etiqueta", async () => {
+    mockRunChannelHandler.mockResolvedValue({
+      ...incomingDm,
+      message: {
+        ...incomingDm.message,
+        text: undefined,
+        contentAttributes: {
+          type: "story_reply",
+          story: { id: "story-1", url: "https://example.com/story-1" },
+        },
+      },
+    })
+
+    await receiveMessage({ ...baseProps, integrationType: "instagram" })
+
+    expect(mockEmitMessageReceived).toHaveBeenCalledWith(
+      "ws-1",
+      "contact-1",
+      expect.objectContaining({ text: "[respuesta a historia]" }),
     )
   })
 })

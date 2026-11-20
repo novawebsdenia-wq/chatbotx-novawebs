@@ -12,6 +12,7 @@ import {
   conversationTransferredToHuman,
   conversationUnassigned,
   followUp,
+  messageReceived,
   newContact,
   subscribedToSequence,
   unsubscribedFromSequence,
@@ -41,3 +42,10 @@ export const allConditions = {
 
 export const conditionSchema = z.union(Object.values(allConditions))
 export type ConditionInput = z.infer<typeof conditionSchema>
+
+// Webhooks also accept the webhook-only events, which no trigger can fire on
+// (see WEBHOOK_ONLY_EVENT_TYPES in @chatbotx.io/events).
+export const webhookConditions = { ...allConditions, messageReceived }
+
+export const webhookConditionSchema = z.union(Object.values(webhookConditions))
+export type WebhookConditionInput = z.infer<typeof webhookConditionSchema>

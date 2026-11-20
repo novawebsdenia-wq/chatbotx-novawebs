@@ -3665,7 +3665,8 @@
       "productRemovedFromCart": "Produto removido do carrinho",
       "productOrdered": "Produto pedido",
       "contactReferredANewContact": "Contato indicou um novo contato",
-      "contactReferredExistingContact": "Contato indicou um contato existente"
+      "contactReferredExistingContact": "Contato indicou um contato existente",
+      "messageReceived": "Mensagem recebida (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "Adicionar tag",

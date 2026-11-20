@@ -3751,7 +3751,8 @@
       "productRemovedFromCart": "商品がカートから削除された",
       "productOrdered": "商品が注文された",
       "contactReferredANewContact": "連絡先が新しい連絡先を紹介した",
-      "contactReferredExistingContact": "連絡先が既存の連絡先を紹介した"
+      "contactReferredExistingContact": "連絡先が既存の連絡先を紹介した",
+      "messageReceived": "メッセージを受信 (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "タグを追加",

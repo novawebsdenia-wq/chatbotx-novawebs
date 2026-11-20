@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest"
 // public field. Every builder in webhook-payload.builder.ts EXCEPT
 // dateTimeBasedTrigger's selectively projects named fields, so seeding
 // eventData with contactInboxId and asserting it never appears in the built
-// payload is a true regression guard for those 16 event types.
+// payload is a true regression guard for those 17 event types.
 //
 // dateTimeBasedTrigger is a DOCUMENTED EXCEPTION, not covered by the same
 // guarantee: its builder is `(basePayload, data) => ({ ...basePayload,
@@ -114,10 +114,18 @@ const EVENT_DATA_BY_TYPE: Record<string, Record<string, unknown>> = {
     refName: "summer",
     reflinkId: "reflink-1",
   },
+  [triggerEventTypes.enum.messageReceived]: {
+    conversationId: "conv-1",
+    inboxId: "inbox-1",
+    channel: "instagram",
+    messageId: "msg-1",
+    text: "hola",
+  },
 }
 
-// Every MatchableEventType EXCEPT dateTimeBasedTrigger (documented exception
-// above) — the 16 EMITTED_EVENT_TYPES from event-type-registry.ts.
+// Every WebhookMatchableEventType EXCEPT dateTimeBasedTrigger (documented
+// exception above) — the 16 EMITTED_EVENT_TYPES plus the webhook-only
+// messageReceived from event-type-registry.ts.
 const SELECTIVELY_PROJECTED_EVENT_TYPES = Object.keys(EVENT_DATA_BY_TYPE)
 
 describe("buildWebhookPayload — contactInboxId never leaks (selectively-projecting builders)", () => {

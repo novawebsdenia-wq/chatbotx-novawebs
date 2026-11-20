@@ -1,5 +1,5 @@
 import type { ContactInfoType } from "@chatbotx.io/database/partials"
-import type { BaseEventEmitter } from "./base-emitter"
+import type { BaseEventEmitter, ReceivedMessageEventData } from "./base-emitter"
 import { logger } from "./logger"
 import { TriggerEventEmitter } from "./trigger/emitter"
 import { WebhookEventEmitter } from "./webhook/emitter"
@@ -156,6 +156,14 @@ export const emitContactInfoUpdated = async (
     oldValue,
     newValue,
   )
+
+// Message events
+// Webhook-only: the trigger emitter drops it before any cache lookup.
+export const emitMessageReceived = async (
+  workspaceId: string,
+  contactId: string,
+  message: ReceivedMessageEventData,
+) => await emitToAllEmitters("messageReceived", workspaceId, contactId, message)
 
 // Conversation events
 export const emitConversationTransferredToHuman = async (

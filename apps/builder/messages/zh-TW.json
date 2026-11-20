@@ -3805,7 +3805,8 @@
       "productRemovedFromCart": "產品已從購物車中刪除",
       "productOrdered": "已訂購產品",
       "contactReferredANewContact": "聯絡人推薦了新聯絡人",
-      "contactReferredExistingContact": "聯絡人引用現有聯絡人"
+      "contactReferredExistingContact": "聯絡人引用現有聯絡人",
+      "messageReceived": "收到訊息 (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "新增標籤",

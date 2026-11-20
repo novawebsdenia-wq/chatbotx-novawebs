@@ -26,19 +26,37 @@ export const SCANNER_VERIFIED_EVENT_TYPES = [
   triggerEventTypes.enum.dateTimeBasedTrigger,
 ] as const
 
+// Emitted to outbound webhooks only. One fires per inbound DM, far too often
+// to look up automations for each, so the trigger emitter never sees them and
+// the trigger editor never offers them.
+export const WEBHOOK_ONLY_EVENT_TYPES = [
+  triggerEventTypes.enum.messageReceived,
+] as const
+
 export type EmittedEventType = (typeof EMITTED_EVENT_TYPES)[number]
 export type ScannerVerifiedEventType =
   (typeof SCANNER_VERIFIED_EVENT_TYPES)[number]
+export type WebhookOnlyEventType = (typeof WEBHOOK_ONLY_EVENT_TYPES)[number]
 export type MatchableEventType = EmittedEventType | ScannerVerifiedEventType
+export type WebhookMatchableEventType =
+  | MatchableEventType
+  | WebhookOnlyEventType
 
 export const EMITTED_EVENT_TYPE_SET: ReadonlySet<TriggerEventType> = new Set(
   EMITTED_EVENT_TYPES,
 )
 
+export const WEBHOOK_EMITTED_EVENT_TYPE_SET: ReadonlySet<TriggerEventType> =
+  new Set([...EMITTED_EVENT_TYPES, ...WEBHOOK_ONLY_EVENT_TYPES])
+
 const MATCHABLE_EVENT_TYPE_SET: ReadonlySet<TriggerEventType> = new Set([
   ...EMITTED_EVENT_TYPES,
   ...SCANNER_VERIFIED_EVENT_TYPES,
 ])
+
+const WEBHOOK_MATCHABLE_EVENT_TYPE_SET: ReadonlySet<TriggerEventType> = new Set(
+  [...MATCHABLE_EVENT_TYPE_SET, ...WEBHOOK_ONLY_EVENT_TYPES],
+)
 
 export function matchableConditionTypesFor(
   eventType: TriggerEventType,
@@ -46,8 +64,8 @@ export function matchableConditionTypesFor(
   return MATCHABLE_EVENT_TYPE_SET.has(eventType) ? [eventType] : []
 }
 
-export function isMatchableEventType(
+export function isWebhookMatchableEventType(
   eventType: TriggerEventType,
-): eventType is MatchableEventType {
-  return MATCHABLE_EVENT_TYPE_SET.has(eventType)
+): eventType is WebhookMatchableEventType {
+  return WEBHOOK_MATCHABLE_EVENT_TYPE_SET.has(eventType)
 }

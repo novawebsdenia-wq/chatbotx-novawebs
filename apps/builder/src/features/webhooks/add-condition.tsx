@@ -124,6 +124,11 @@ export function AddCondition({
               triggerEventTypes.enum.conversationUnassigned,
             ),
           },
+          {
+            label: t("trigger.conditions.messageReceived"),
+            value: triggerEventTypes.enum.messageReceived,
+            defaultFn: createDefaultFn(triggerEventTypes.enum.messageReceived),
+          },
         ],
       },
 

@@ -3772,7 +3772,8 @@
       "productRemovedFromCart": "Produs eliminat din coș",
       "productOrdered": "Produs comandat",
       "contactReferredANewContact": "Contactul a recomandat un contact nou",
-      "contactReferredExistingContact": "Contactul a recomandat un contact existent"
+      "contactReferredExistingContact": "Contactul a recomandat un contact existent",
+      "messageReceived": "Mesaj primit (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "Adaugă etichetă",

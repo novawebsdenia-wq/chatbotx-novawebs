@@ -1,6 +1,6 @@
 import type { TriggerEventType } from "@chatbotx.io/database/partials"
 import type { ConditionModel, WebhookModel } from "@chatbotx.io/database/types"
-import type { MatchableEventType } from "@chatbotx.io/events"
+import type { WebhookMatchableEventType } from "@chatbotx.io/events"
 
 export type WebhookWithConditions = WebhookModel & {
   conditions: ConditionModel[]
@@ -16,7 +16,7 @@ export type WebhookEventData = {
 }
 
 export type MatchableWebhookEventData = WebhookEventData & {
-  eventType: MatchableEventType
+  eventType: WebhookMatchableEventType
 }
 
 /**

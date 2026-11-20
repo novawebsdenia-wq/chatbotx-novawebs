@@ -1,13 +1,13 @@
 import type { TriggerEventType } from "@chatbotx.io/database/partials"
 import { webhookQueue } from "@chatbotx.io/worker-config"
 import { BaseEventEmitter } from "../base-emitter"
-import { EMITTED_EVENT_TYPE_SET } from "../event-type-registry"
+import { WEBHOOK_EMITTED_EVENT_TYPE_SET } from "../event-type-registry"
 import { logger } from "../logger"
 import { hasActiveWebhooks } from "./cache"
 import { isWebhookContext } from "./context"
 
 class WebhookEventEmitterImpl extends BaseEventEmitter {
-  protected supportedEventTypes = EMITTED_EVENT_TYPE_SET
+  protected supportedEventTypes = WEBHOOK_EMITTED_EVENT_TYPE_SET
 
   protected async shouldEmitEvent(
     eventType: TriggerEventType,

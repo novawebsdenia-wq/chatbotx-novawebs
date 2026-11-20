@@ -3772,7 +3772,8 @@
       "productRemovedFromCart": "Ürün Sepetten Kaldırıldı",
       "productOrdered": "Ürün Sipariş Edildi",
       "contactReferredANewContact": "Kişi Yeni Bir Kişi Yönlendirdi",
-      "contactReferredExistingContact": "Kişi Mevcut Bir Kişiyi Yönlendirdi"
+      "contactReferredExistingContact": "Kişi Mevcut Bir Kişiyi Yönlendirdi",
+      "messageReceived": "Mesaj alındı (Instagram / Messenger)"
     },
     "actions": {
       "addTag": "Etiket Ekle",

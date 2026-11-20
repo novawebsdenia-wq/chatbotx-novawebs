@@ -1,6 +1,8 @@
-import type { ConditionInput } from "./schemas"
+import type { ConditionInput, WebhookConditionInput } from "./schemas"
 
-export const toConditionColumns = (condition: ConditionInput) => ({
+export const toConditionColumns = (
+  condition: ConditionInput | WebhookConditionInput,
+) => ({
   type: condition.type,
   sourceId: "sourceId" in condition ? condition.sourceId : null,
   operator: "operator" in condition ? condition.operator : null,
