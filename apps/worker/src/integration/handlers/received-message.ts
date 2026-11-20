@@ -119,6 +119,14 @@ const correctStoryReplyDirectionForNewContact = (
   return message
 }
 
+// Meta echoes every DM the account sends. Our own sends carry
+// `SENT_FROM_CHATBOTX` metadata and are dropped by the webhook, so an echo
+// that reaches this point was written by a human in the native app.
+const HUMAN_ECHO_PAUSE_INTEGRATIONS = new Set<string>([
+  "instagram",
+  "messenger",
+])
+
 const APPOINTMENT_CANCEL_FEEDBACK_COPY = {
   en: {
     unavailable:
@@ -339,6 +347,28 @@ export const receiveMessage = async (
 
     if (isNewMessage) {
       createdMessage = newMessage
+
+      if (
+        incomingMessage.messageType === messageTypes.enum.outgoing &&
+        (incomingMessage.type ?? "message") === "message" &&
+        HUMAN_ECHO_PAUSE_INTEGRATIONS.has(integrationType)
+      ) {
+        try {
+          await conversationService.pauseBotForHumanReply({
+            conversation,
+            triggerContext: {
+              triggerSource: "webhook",
+              triggerHandler: "receiveMessage",
+              triggerType: "conversation_transferred_to_human",
+            },
+          })
+        } catch (error) {
+          logger.warn(
+            { error, conversationId: conversation.id, channel: inbox.channel },
+            "Pausing the bot after a human echo failed",
+          )
+        }
+      }
 
       if (appointmentCancelToken) {
         try {

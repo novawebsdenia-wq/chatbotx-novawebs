@@ -13,7 +13,7 @@ import { workspaceActionClient } from "@/lib/safe-action"
 export const disableBotForConversations = async (props: {
   workspaceId: string
   ids: string[]
-  userId: string
+  userId?: string
 }) => {
   const conversations = await conversationService.findManyByIds({
     workspaceId: props.workspaceId,

@@ -907,6 +907,38 @@ class ConversationService extends BaseService {
     }
   }
 
+  /**
+   * A human answered outside the bot: pause it for the usual
+   * BOT_DISABLE_DURATION_MS. Same rule as the inbox composer — only a bot that
+   * is currently active gets paused, so a running pause is not extended and a
+   * bot switched off by hand is not turned into a timed pause.
+   */
+  async pauseBotForHumanReply(props: {
+    conversation: Pick<
+      ConversationModel,
+      "id" | "workspaceId" | "contactId" | "botEnabled" | "botResumeAt"
+    >
+    triggerContext: TriggerContext
+  }): Promise<boolean> {
+    const { conversation } = props
+    const isBotActive =
+      conversation.botEnabled ||
+      (conversation.botResumeAt !== null &&
+        new Date(conversation.botResumeAt).getTime() <= Date.now())
+    if (!isBotActive) {
+      return false
+    }
+
+    await this.disableBotState({
+      workspaceId: conversation.workspaceId,
+      conversations: [
+        { id: conversation.id, contactId: conversation.contactId },
+      ],
+      triggerContext: props.triggerContext,
+    })
+    return true
+  }
+
   async enableBotState(props: {
     workspaceId: string
     conversations: { id: string; contactId: string }[]

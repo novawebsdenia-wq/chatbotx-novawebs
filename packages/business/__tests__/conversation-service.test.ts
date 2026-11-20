@@ -353,3 +353,98 @@ describe("conversationService.markReadByContact", () => {
     ])
   })
 })
+
+describe("conversationService.pauseBotForHumanReply", () => {
+  const triggerContext = {
+    triggerSource: "webhook",
+    triggerHandler: "receiveMessage",
+    triggerType: "conversation_transferred_to_human",
+  }
+  const baseConversation = {
+    id: "conv-1",
+    workspaceId: "ws-1",
+    contactId: "contact-1",
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+  })
+
+  test("pauses an active bot with the existing 24h disable", async () => {
+    const disableBotState = vi
+      .spyOn(conversationService, "disableBotState")
+      .mockResolvedValue(undefined)
+
+    await expect(
+      conversationService.pauseBotForHumanReply({
+        conversation: {
+          ...baseConversation,
+          botEnabled: true,
+          botResumeAt: null,
+        },
+        triggerContext,
+      }),
+    ).resolves.toBe(true)
+
+    expect(disableBotState).toHaveBeenCalledWith({
+      workspaceId: "ws-1",
+      conversations: [{ id: "conv-1", contactId: "contact-1" }],
+      triggerContext,
+    })
+  })
+
+  test("re-pauses when the previous pause already expired", async () => {
+    const disableBotState = vi
+      .spyOn(conversationService, "disableBotState")
+      .mockResolvedValue(undefined)
+
+    await conversationService.pauseBotForHumanReply({
+      conversation: {
+        ...baseConversation,
+        botEnabled: false,
+        botResumeAt: new Date(Date.now() - 60_000),
+      },
+      triggerContext,
+    })
+
+    expect(disableBotState).toHaveBeenCalledTimes(1)
+  })
+
+  test("does not extend a running pause", async () => {
+    const disableBotState = vi
+      .spyOn(conversationService, "disableBotState")
+      .mockResolvedValue(undefined)
+
+    await expect(
+      conversationService.pauseBotForHumanReply({
+        conversation: {
+          ...baseConversation,
+          botEnabled: false,
+          botResumeAt: new Date(Date.now() + 60_000),
+        },
+        triggerContext,
+      }),
+    ).resolves.toBe(false)
+
+    expect(disableBotState).not.toHaveBeenCalled()
+  })
+
+  test("leaves a bot switched off by hand (no resume time) alone", async () => {
+    const disableBotState = vi
+      .spyOn(conversationService, "disableBotState")
+      .mockResolvedValue(undefined)
+
+    await expect(
+      conversationService.pauseBotForHumanReply({
+        conversation: {
+          ...baseConversation,
+          botEnabled: false,
+          botResumeAt: null,
+        },
+        triggerContext,
+      }),
+    ).resolves.toBe(false)
+
+    expect(disableBotState).not.toHaveBeenCalled()
+  })
+})

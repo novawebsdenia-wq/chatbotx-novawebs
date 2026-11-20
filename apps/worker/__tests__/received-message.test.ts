@@ -20,6 +20,7 @@ const {
   mockUpdateContactFromMessage,
   mockContactUnblockIfBlocked,
   mockConversationFindOrCreate,
+  mockConversationPauseBotForHumanReply,
   mockAutomatedResponseEnqueueFlowAction,
   mockIntegrationQueueAdd,
   mockDbSet,
@@ -82,6 +83,7 @@ const {
     mockContactUnblockIfBlocked: vi.fn().mockResolvedValue(null),
     mockContactUpdate: vi.fn().mockResolvedValue({}),
     mockConversationFindOrCreate: vi.fn(),
+    mockConversationPauseBotForHumanReply: vi.fn().mockResolvedValue(true),
     mockAutomatedResponseEnqueueFlowAction: vi
       .fn()
       .mockResolvedValue(undefined),
@@ -178,7 +180,10 @@ vi.mock("@chatbotx.io/business", () => ({
     unblockIfBlocked: mockContactUnblockIfBlocked,
     update: mockContactUpdate,
   },
-  conversationService: { findOrCreate: mockConversationFindOrCreate },
+  conversationService: {
+    findOrCreate: mockConversationFindOrCreate,
+    pauseBotForHumanReply: mockConversationPauseBotForHumanReply,
+  },
   workspaceService: {
     find: mockWorkspaceFind,
     findById: vi.fn().mockResolvedValue({
@@ -297,6 +302,9 @@ vi.mock("../src/lib/db", () => ({
 
 vi.mock("../src/services/integrations", () => ({
   allIntegrations: {
+    instagram: {
+      runChannelHandler: mockRunChannelHandler,
+    },
     messenger: {
       runChannelHandler: mockRunChannelHandler,
       // Messenger comment path fetches the comment attachment; no attachment here.
@@ -315,6 +323,7 @@ vi.mock("../src/services/integrations", () => ({
   integrationService: {
     identifyInboxAndIntegrationAuthFromIdentifier: vi.fn(),
   },
+  isInstagramViaFacebook: vi.fn(() => false),
 }))
 
 // ---------------------------------------------------------------------------
@@ -2128,5 +2137,131 @@ describe("receiveMessage — new BSUID-keyed contact creation (D2/D8/§8.1)", ()
     await expect(
       receiveMessage({ ...baseProps, integrationType: "whatsapp" }),
     ).rejects.toThrow("connection reset")
+  })
+})
+
+describe("receiveMessage — pausa del bot cuando contesta un humano", () => {
+  const humanEcho = {
+    message: {
+      ...baseIncomingMessage,
+      sourceId: "mid-human-1",
+      messageType: "outgoing",
+      text: "Te lo miro y te digo",
+      attachments: [],
+    },
+    contact: { sourceId: "psid-123", firstName: "Test" },
+    postbackAction: null,
+    quickReplyAction: null,
+    ref: null,
+  }
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mockFindContactInbox.mockResolvedValue({
+      ...fakeContactInbox,
+      contact: fakeContact,
+    })
+    mockConversationFindOrCreate.mockResolvedValue(fakeConversation)
+    vi.mocked(
+      integrationService.identifyInboxAndIntegrationAuthFromIdentifier,
+    ).mockResolvedValue({
+      inbox: fakeInbox,
+      integrationRow: fakeIntegrationRow,
+    } as never)
+    mockBuildContext.mockResolvedValue({ workspaceId: "ws-1" })
+    mockresolveTenantSettings.mockResolvedValue({
+      storageUrl: "https://files.example.test",
+    })
+    mockCreateMessageRepository.mockResolvedValue({
+      createOrUpdate: mockCreateOrUpdate,
+      createOrUpdateWithAttachments: mockCreateOrUpdateWithAttachments,
+    })
+    mockCreateOrUpdate.mockResolvedValue({
+      message: { ...fakeCreatedMessage, messageType: "outgoing" },
+      isNew: true,
+    })
+  })
+
+  test.each([
+    "instagram",
+    "messenger",
+  ])("un eco humano de %s pausa el bot del DM", async (integrationType) => {
+    mockRunChannelHandler.mockResolvedValue(humanEcho)
+
+    await receiveMessage({ ...baseProps, integrationType })
+
+    expect(mockConversationPauseBotForHumanReply).toHaveBeenCalledWith({
+      conversation: fakeConversation,
+      triggerContext: {
+        triggerSource: "webhook",
+        triggerHandler: "receiveMessage",
+        triggerType: "conversation_transferred_to_human",
+      },
+    })
+  })
+
+  test("Instagram conectado con Facebook también pausa", async () => {
+    const services = await import("../src/services/integrations")
+    vi.mocked(services.isInstagramViaFacebook).mockReturnValueOnce(true)
+    mockRunChannelHandler.mockResolvedValue(humanEcho)
+
+    await receiveMessage({ ...baseProps, integrationType: "instagram" })
+
+    expect(mockConversationPauseBotForHumanReply).toHaveBeenCalledTimes(1)
+  })
+
+  test("el eco de un mensaje que ya guardó ChatbotX (el bot) no pausa", async () => {
+    mockRunChannelHandler.mockResolvedValue(humanEcho)
+    mockCreateOrUpdate.mockResolvedValue({
+      message: { ...fakeCreatedMessage, messageType: "outgoing" },
+      isNew: false,
+    })
+
+    await receiveMessage({ ...baseProps, integrationType: "instagram" })
+
+    expect(mockConversationPauseBotForHumanReply).not.toHaveBeenCalled()
+  })
+
+  test("un mensaje del contacto no pausa", async () => {
+    mockRunChannelHandler.mockResolvedValue({
+      ...humanEcho,
+      message: { ...humanEcho.message, messageType: "incoming" },
+    })
+    mockCreateOrUpdate.mockResolvedValue({
+      message: fakeCreatedMessage,
+      isNew: true,
+    })
+
+    await receiveMessage({ ...baseProps, integrationType: "instagram" })
+
+    expect(mockConversationPauseBotForHumanReply).not.toHaveBeenCalled()
+  })
+
+  test("los ecos de otros canales (Zalo) siguen sin pausar", async () => {
+    mockRunChannelHandler.mockResolvedValue(humanEcho)
+
+    await receiveMessage({ ...baseProps, integrationType: "zalo" })
+
+    expect(mockConversationPauseBotForHumanReply).not.toHaveBeenCalled()
+  })
+
+  test("si falla la pausa, el mensaje se guarda igual", async () => {
+    mockRunChannelHandler.mockResolvedValue(humanEcho)
+    mockConversationPauseBotForHumanReply.mockRejectedValueOnce(
+      new Error("db down"),
+    )
+
+    const result = await receiveMessage({
+      ...baseProps,
+      integrationType: "messenger",
+    })
+
+    expect(result.message).toEqual(
+      expect.objectContaining({ id: "msg-created" }),
+    )
+    expect(logger.warn).toHaveBeenCalledWith(
+      expect.objectContaining({ conversationId: "conv-1" }),
+      "Pausing the bot after a human echo failed",
+    )
   })
 })
