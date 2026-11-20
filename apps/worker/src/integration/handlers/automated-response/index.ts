@@ -121,7 +121,10 @@ export async function processAutomatedResponse(
   }
 
   try {
-    const aiAgent = await aiAgentService.findDefault(conversation.workspaceId)
+    const aiAgent = await aiAgentService.findDefaultForInbox({
+      workspaceId: conversation.workspaceId,
+      inboxId: contactInbox.inboxId,
+    })
 
     if (!aiAgent) {
       const defaultReplyResult = await triggerDefaultReplyFlow({

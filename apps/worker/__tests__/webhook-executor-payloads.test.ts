@@ -110,6 +110,38 @@ const payloadCases = [
     },
   },
   {
+    // AI handoff: emitted without transferredBy
+    eventType: triggerEventTypes.enum.conversationTransferredToHuman,
+    metadata: { conversationId: "conversation-1" },
+    expectedPayload: {
+      ...basePayload("conversation_transferred_to_human"),
+      conversation_id: "conversation-1",
+      transferred_by: "bot",
+    },
+  },
+  {
+    // A person replied from the Instagram app or through the messages API
+    eventType: triggerEventTypes.enum.conversationTransferredToHuman,
+    metadata: {
+      conversationId: "conversation-1",
+      transferredBy: "human_reply",
+    },
+    expectedPayload: {
+      ...basePayload("conversation_transferred_to_human"),
+      conversation_id: "conversation-1",
+      transferred_by: "human_reply",
+    },
+  },
+  {
+    eventType: triggerEventTypes.enum.conversationTransferredToHuman,
+    metadata: { conversationId: "conversation-1", transferredBy: "panel" },
+    expectedPayload: {
+      ...basePayload("conversation_transferred_to_human"),
+      conversation_id: "conversation-1",
+      transferred_by: "panel",
+    },
+  },
+  {
     eventType: triggerEventTypes.enum.conversationTransferredToBot,
     metadata: { conversationId: "conversation-1" },
     expectedPayload: {

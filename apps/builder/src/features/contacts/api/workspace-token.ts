@@ -7,9 +7,17 @@ import {
   tagService,
 } from "@chatbotx.io/business"
 import { notFoundException } from "@chatbotx.io/business/errors"
-import { contactSources, genderTypes } from "@chatbotx.io/database/partials"
+import {
+  channelTypes,
+  contactSources,
+  genderTypes,
+} from "@chatbotx.io/database/partials"
+import type { ConversationModel } from "@chatbotx.io/database/types"
 import { zodBigintAsString } from "@chatbotx.io/utils"
 import { z } from "zod"
+import { disableBotForConversations } from "@/features/conversations/actions/disable-bot.action"
+import { enableBotForConversations } from "@/features/conversations/actions/enable-bot.action"
+import { isConversationActive } from "@/features/conversations/utils/bot-state"
 import { createMessage } from "@/features/messages/actions/create-message.action"
 import {
   listMessages,
@@ -54,6 +62,38 @@ import {
   publicListContactsByCustomFieldRequest,
   publicListContactsResponse,
 } from "../schemas/query"
+
+const contactBotStateResponse = z.object({
+  conversationId: z.string(),
+  botEnabled: z.boolean(),
+  botResumeAt: z.coerce.date().nullable(),
+  // false while paused or switched off; a pause past its resume time is active
+  botActive: z.boolean(),
+})
+
+// The bot only answers DMs, which live in the contact's conversation with a
+// null sourceId (comment threads are separate conversations).
+const findContactDMConversation = async (props: {
+  identifier: string
+  workspaceId: string
+}): Promise<ConversationModel> => {
+  const contactId = await resolveContactId(props)
+  const conversation = await conversationService.findDMByContact({
+    workspaceId: props.workspaceId,
+    contactId,
+  })
+  if (!conversation) {
+    throw notFoundException("Conversation not found")
+  }
+  return conversation
+}
+
+const toContactBotState = (conversation: ConversationModel) => ({
+  conversationId: conversation.id,
+  botEnabled: conversation.botEnabled,
+  botResumeAt: conversation.botResumeAt,
+  botActive: isConversationActive(conversation),
+})
 
 export const workspaceTokenAuthAPIs = {
   listContactsWorkspaceTokenAPI: workspaceTokenAuthAPI
@@ -446,6 +486,92 @@ export const workspaceTokenAuthAPIs = {
         contactInbox,
         parsedInput: input,
       })
+
+      // Same as replying from the inbox composer: a human answered, so the
+      // bot pauses on the DM. Sending a flow is the bot itself, and a public
+      // comment reply is not a DM.
+      const isPublicCommentReply =
+        Boolean(input.replyToMessageId) && !input.isPrivateReply
+      if (!("flowId" in input || isPublicCommentReply)) {
+        const dmConversation = await conversationService.findDMByContact({
+          workspaceId: context.workspace.id,
+          contactId,
+          channel: channelTypes.safeParse(contactInbox.channel).data,
+        })
+        if (dmConversation) {
+          await conversationService.pauseBotForHumanReply({
+            conversation: dmConversation,
+            triggerContext: {
+              triggerSource: "api",
+              triggerHandler: "sendMessageWorkspaceTokenAPI",
+              triggerType: "conversation_transferred_to_human",
+            },
+          })
+        }
+      }
+    }),
+
+  getContactBotWorkspaceTokenAPI: workspaceTokenAuthAPI
+    .route({
+      method: "GET",
+      path: "/v1/contacts/{identifier}/bot",
+      summary: "Get the bot state of a contact's DM conversation",
+      tags: ["Contacts"],
+    })
+    .input(z.object({ identifier: z.string().min(1) }))
+    .output(contactBotStateResponse)
+    .handler(async ({ context, input }) =>
+      toContactBotState(
+        await findContactDMConversation({
+          identifier: input.identifier,
+          workspaceId: context.workspace.id,
+        }),
+      ),
+    ),
+
+  pauseContactBotWorkspaceTokenAPI: workspaceTokenAuthAPI
+    .route({
+      method: "POST",
+      path: "/v1/contacts/{identifier}/bot/pause",
+      summary: "Pause the bot on a contact's DM conversation for 24 hours",
+      tags: ["Contacts"],
+    })
+    .input(z.object({ identifier: z.string().min(1) }))
+    .output(contactBotStateResponse)
+    .handler(async ({ context, input }) => {
+      const params = {
+        identifier: input.identifier,
+        workspaceId: context.workspace.id,
+      }
+      const conversation = await findContactDMConversation(params)
+      await disableBotForConversations({
+        workspaceId: context.workspace.id,
+        ids: [conversation.id],
+        transferredBy: "panel",
+      })
+      return toContactBotState(await findContactDMConversation(params))
+    }),
+
+  resumeContactBotWorkspaceTokenAPI: workspaceTokenAuthAPI
+    .route({
+      method: "POST",
+      path: "/v1/contacts/{identifier}/bot/resume",
+      summary: "Resume the bot on a contact's DM conversation",
+      tags: ["Contacts"],
+    })
+    .input(z.object({ identifier: z.string().min(1) }))
+    .output(contactBotStateResponse)
+    .handler(async ({ context, input }) => {
+      const params = {
+        identifier: input.identifier,
+        workspaceId: context.workspace.id,
+      }
+      const conversation = await findContactDMConversation(params)
+      await enableBotForConversations({
+        workspaceId: context.workspace.id,
+        ids: [conversation.id],
+      })
+      return toContactBotState(await findContactDMConversation(params))
     }),
 
   listContactMessagesWorkspaceTokenAPI: workspaceTokenAuthAPI

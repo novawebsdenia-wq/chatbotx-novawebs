@@ -92,6 +92,24 @@ class InboxService extends BaseService {
     // )
   }
 
+  async updateAIAgentEnabled(props: {
+    workspaceId: string
+    inboxId: string
+    enabled: boolean
+  }): Promise<InboxModel | undefined> {
+    const [inbox] = await db
+      .update(inboxModel)
+      .set({ aiAgentEnabled: props.enabled })
+      .where(
+        and(
+          eq(inboxModel.id, props.inboxId),
+          eq(inboxModel.workspaceId, props.workspaceId),
+        ),
+      )
+      .returning()
+    return inbox
+  }
+
   async findWithIntegrationsById(props: {
     id: string
   }): Promise<InboxWithIntegrations | undefined> {

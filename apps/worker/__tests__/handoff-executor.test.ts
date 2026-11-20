@@ -78,6 +78,14 @@ describe("HandoffExecutorService", () => {
       botEnabled: false,
       botResumeAt: new Date("2026-01-02T00:00:00.000Z"),
     })
+    // The AI handoff names nobody, so the webhook keeps transferred_by "bot"
+    // (human replies and panel pauses send "human_reply" / "panel" instead).
+    const { emitConversationTransferredToHuman } = await import(
+      "@chatbotx.io/events"
+    )
+    expect(vi.mocked(emitConversationTransferredToHuman).mock.calls).toEqual([
+      ["ws-1", "contact-1", "conv-1"],
+    ])
     expect(emitSpy).toHaveBeenCalledWith(
       "analytics:dashboard",
       expect.objectContaining({

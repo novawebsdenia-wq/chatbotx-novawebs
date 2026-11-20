@@ -1,4 +1,8 @@
-import { aiAgentService, workspaceService } from "@chatbotx.io/business"
+import {
+  aiAgentService,
+  contactInboxService,
+  workspaceService,
+} from "@chatbotx.io/business"
 import { isSmartResponseDelayOption } from "@chatbotx.io/database/partials"
 import { simpleQueue } from "@chatbotx.io/redis"
 import {
@@ -33,7 +37,17 @@ export const enqueueMessage = async (props: {
         props.messageText
           ? automatedResponseService.getAll(props.workspaceId)
           : Promise.resolve([]),
-        aiAgentService.findDefault(props.workspaceId),
+        // Smart delay only waits for an agent that may answer in this inbox.
+        contactInboxService
+          .findBy({ where: { id: props.contactInboxId } })
+          .then((contactInbox) =>
+            contactInbox
+              ? aiAgentService.findDefaultForInbox({
+                  workspaceId: props.workspaceId,
+                  inboxId: contactInbox.inboxId,
+                })
+              : undefined,
+          ),
       ])
       const keywordRules = allAutomatedResponses.filter(
         (rule) => rule.type === "inbound",

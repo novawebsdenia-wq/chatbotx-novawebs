@@ -238,6 +238,25 @@ class AiAgentService extends BaseService {
     )
   }
 
+  /**
+   * The default agent, but only for an inbox whose `aiAgentEnabled` switch is
+   * on. With the switch off (the default) the inbox gets `undefined`, exactly
+   * as if the workspace had no agent at all.
+   */
+  async findDefaultForInbox(props: {
+    workspaceId: string
+    inboxId: string
+  }): Promise<AIAgentModel | undefined> {
+    const inbox = await db.query.inboxModel.findFirst({
+      where: { id: props.inboxId, workspaceId: props.workspaceId },
+      columns: { aiAgentEnabled: true },
+    })
+    if (!inbox?.aiAgentEnabled) {
+      return
+    }
+    return await this.findDefault(props.workspaceId)
+  }
+
   async create(
     workspaceId: string,
     data: CreateAIAgentRequest,

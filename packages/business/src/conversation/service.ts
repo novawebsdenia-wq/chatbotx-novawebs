@@ -879,6 +879,10 @@ class ConversationService extends BaseService {
     workspaceId: string
     conversations: { id: string; contactId: string }[]
     userId?: string
+    // Only for the transferred-to-human event. Without it (and without
+    // userId) the webhook reports `transferred_by: "bot"`, which is what the
+    // AI handoff sends — so callers that are not the bot must name themselves.
+    transferredBy?: string
     triggerContext: TriggerContext
     tx?: DatabaseClient
   }): Promise<void> {
@@ -894,7 +898,7 @@ class ConversationService extends BaseService {
         props.workspaceId,
         conv.contactId,
         conv.id,
-        props.userId,
+        props.transferredBy ?? props.userId,
       )
 
       emit("analytics:dashboard", {
@@ -905,6 +909,39 @@ class ConversationService extends BaseService {
         metadata: { triggerContext: props.triggerContext },
       })
     }
+  }
+
+  /**
+   * A human answered outside the bot: pause it for the usual
+   * BOT_DISABLE_DURATION_MS. Same rule as the inbox composer — only a bot that
+   * is currently active gets paused, so a running pause is not extended and a
+   * bot switched off by hand is not turned into a timed pause.
+   */
+  async pauseBotForHumanReply(props: {
+    conversation: Pick<
+      ConversationModel,
+      "id" | "workspaceId" | "contactId" | "botEnabled" | "botResumeAt"
+    >
+    triggerContext: TriggerContext
+  }): Promise<boolean> {
+    const { conversation } = props
+    const isBotActive =
+      conversation.botEnabled ||
+      (conversation.botResumeAt !== null &&
+        new Date(conversation.botResumeAt).getTime() <= Date.now())
+    if (!isBotActive) {
+      return false
+    }
+
+    await this.disableBotState({
+      workspaceId: conversation.workspaceId,
+      conversations: [
+        { id: conversation.id, contactId: conversation.contactId },
+      ],
+      transferredBy: "human_reply",
+      triggerContext: props.triggerContext,
+    })
+    return true
   }
 
   async enableBotState(props: {

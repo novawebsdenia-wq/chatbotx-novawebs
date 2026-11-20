@@ -5,6 +5,7 @@ const {
   mockDelete,
   mockFindFirst,
   mockFindMany,
+  mockInboxFindFirst,
   mockInsert,
   mockInvalidateCacheByTags,
   mockTransaction,
@@ -20,6 +21,7 @@ const {
   const mockDeleteWhere = vi.fn()
   const mockDelete = vi.fn(() => ({ where: mockDeleteWhere }))
   const mockTemplateInstalledResourceFindMany = vi.fn(async () => [])
+  const mockInboxFindFirst = vi.fn()
 
   const dbClient = {
     delete: mockDelete,
@@ -43,6 +45,7 @@ const {
     mockDelete,
     mockFindFirst: dbClient.query.aiAgentModel.findFirst,
     mockFindMany: dbClient.query.aiAgentModel.findMany,
+    mockInboxFindFirst,
     mockInsert,
     mockInvalidateCacheByTags: vi.fn(),
     mockTransaction: dbClient.transaction,
@@ -67,6 +70,9 @@ vi.mock("@chatbotx.io/database/client", () => ({
       aiAgentModel: {
         findFirst: mockFindFirst,
         findMany: mockFindMany,
+      },
+      inboxModel: {
+        findFirst: mockInboxFindFirst,
       },
       templateInstalledResourceModel: {
         findMany: mockTemplateInstalledResourceFindMany,
@@ -168,6 +174,43 @@ describe("aiAgentService.findDefault", () => {
     await expect(
       aiAgentService.findDefault(workspaceId),
     ).resolves.toBeUndefined()
+  })
+})
+
+describe("aiAgentService.findDefaultForInbox", () => {
+  test("inbox with the AI switch off gets no agent, as if the workspace had none", async () => {
+    mockInboxFindFirst.mockResolvedValue({ aiAgentEnabled: false })
+
+    await expect(
+      aiAgentService.findDefaultForInbox({ workspaceId, inboxId: "inbox-1" }),
+    ).resolves.toBeUndefined()
+
+    expect(mockInboxFindFirst).toHaveBeenCalledWith({
+      where: { id: "inbox-1", workspaceId },
+      columns: { aiAgentEnabled: true },
+    })
+    expect(mockFindFirst).not.toHaveBeenCalled()
+  })
+
+  test("inbox with the AI switch on gets the workspace default agent", async () => {
+    mockInboxFindFirst.mockResolvedValue({ aiAgentEnabled: true })
+
+    await expect(
+      aiAgentService.findDefaultForInbox({ workspaceId, inboxId: "inbox-1" }),
+    ).resolves.toBe(aiAgent)
+
+    expect(mockFindFirst).toHaveBeenCalledWith({
+      where: { isDefault: true, workspaceId },
+    })
+  })
+
+  test("an inbox from another workspace (not found) gets no agent", async () => {
+    mockInboxFindFirst.mockResolvedValue(undefined)
+
+    await expect(
+      aiAgentService.findDefaultForInbox({ workspaceId, inboxId: "inbox-9" }),
+    ).resolves.toBeUndefined()
+    expect(mockFindFirst).not.toHaveBeenCalled()
   })
 })
 
