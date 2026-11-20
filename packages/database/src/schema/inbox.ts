@@ -1,4 +1,4 @@
-import { index, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core"
+import { boolean, index, pgTable, text, uniqueIndex } from "drizzle-orm/pg-core"
 import { bigintAsString, sharedColumns } from "../partials/shared"
 import { workspaceModel } from "./workspace"
 
@@ -16,6 +16,9 @@ export const inboxModel = pgTable(
         onUpdate: "cascade",
       }),
     status: text().notNull().default("connected"),
+    // Whether the workspace's default AI agent may answer DMs in this inbox.
+    // Off by default: the inbox then behaves as if no agent existed.
+    aiAgentEnabled: boolean().notNull().default(false),
   },
   (table) => [
     index("Inbox_workspaceId_idx").using(

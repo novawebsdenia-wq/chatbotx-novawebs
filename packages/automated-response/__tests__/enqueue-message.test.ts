@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, test, vi } from "vitest"
 const {
   mockAiAgentFindDefault,
   mockAutomatedResponseGetAll,
+  mockContactInboxFindBy,
   mockIntegrationQueueAdd,
   mockLoggerWarn,
   mockSimpleQueueEnqueue,
@@ -10,6 +11,7 @@ const {
 } = vi.hoisted(() => ({
   mockAiAgentFindDefault: vi.fn(),
   mockAutomatedResponseGetAll: vi.fn(),
+  mockContactInboxFindBy: vi.fn(),
   mockIntegrationQueueAdd: vi.fn().mockResolvedValue(undefined),
   mockLoggerWarn: vi.fn(),
   mockSimpleQueueEnqueue: vi.fn().mockResolvedValue(undefined),
@@ -18,7 +20,10 @@ const {
 
 vi.mock("@chatbotx.io/business", () => ({
   aiAgentService: {
-    findDefault: mockAiAgentFindDefault,
+    findDefaultForInbox: mockAiAgentFindDefault,
+  },
+  contactInboxService: {
+    findBy: mockContactInboxFindBy,
   },
   workspaceService: {
     findById: mockWorkspaceFindById,
@@ -76,6 +81,10 @@ describe("enqueueMessage", () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mockAiAgentFindDefault.mockResolvedValue({ id: "ai-agent-1" })
+    mockContactInboxFindBy.mockResolvedValue({
+      id: "contact-inbox-1",
+      inboxId: "inbox-1",
+    })
     mockAutomatedResponseGetAll.mockResolvedValue([])
   })
 
@@ -88,7 +97,13 @@ describe("enqueueMessage", () => {
 
     expect(mockWorkspaceFindById).toHaveBeenCalledWith({ id: "workspace-1" })
     expect(mockAutomatedResponseGetAll).toHaveBeenCalledWith("workspace-1")
-    expect(mockAiAgentFindDefault).toHaveBeenCalledWith("workspace-1")
+    expect(mockContactInboxFindBy).toHaveBeenCalledWith({
+      where: { id: "contact-inbox-1" },
+    })
+    expect(mockAiAgentFindDefault).toHaveBeenCalledWith({
+      workspaceId: "workspace-1",
+      inboxId: "inbox-1",
+    })
     expect(mockIntegrationQueueAdd).toHaveBeenCalledWith(
       "processAutomatedResonse",
       {
@@ -163,6 +178,29 @@ describe("enqueueMessage", () => {
     )
   })
 
+  test("preserves v1 env timing when the inbox has the AI agent switched off", async () => {
+    mockWorkspaceFindById.mockResolvedValue({
+      smartResponseDelaySeconds: 30,
+    })
+    // findDefaultForInbox returns undefined for an inbox with AI off
+    mockAiAgentFindDefault.mockResolvedValue(undefined)
+
+    await enqueueMessage(enqueueProps)
+
+    expect(mockAiAgentFindDefault).toHaveBeenCalledWith({
+      workspaceId: "workspace-1",
+      inboxId: "inbox-1",
+    })
+    expect(mockIntegrationQueueAdd).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.any(Object),
+      expect.objectContaining({
+        delay: 2000,
+        deduplication: expect.objectContaining({ ttl: 2000 }),
+      }),
+    )
+  })
+
   test("skips keyword lookup when message text is omitted", async () => {
     mockWorkspaceFindById.mockResolvedValue({
       smartResponseDelaySeconds: 30,
@@ -176,7 +214,13 @@ describe("enqueueMessage", () => {
     })
 
     expect(mockAutomatedResponseGetAll).not.toHaveBeenCalled()
-    expect(mockAiAgentFindDefault).toHaveBeenCalledWith("workspace-1")
+    expect(mockContactInboxFindBy).toHaveBeenCalledWith({
+      where: { id: "contact-inbox-1" },
+    })
+    expect(mockAiAgentFindDefault).toHaveBeenCalledWith({
+      workspaceId: "workspace-1",
+      inboxId: "inbox-1",
+    })
     expect(mockIntegrationQueueAdd).toHaveBeenCalledWith(
       expect.any(String),
       expect.any(Object),

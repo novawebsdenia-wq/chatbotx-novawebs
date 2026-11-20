@@ -1,4 +1,5 @@
 import { listInboxesRequest } from "@chatbotx.io/business"
+import { zodBigintAsString } from "@chatbotx.io/utils"
 import { createSearchParamsCache, parseAsInteger } from "nuqs/server"
 import { z } from "zod"
 import { inboxResource } from "./resource"
@@ -18,6 +19,7 @@ export const publicInboxResource = inboxResource.pick({
   name: true,
   channel: true,
   status: true,
+  aiAgentEnabled: true,
 })
 
 export const publicListInboxResponse = z.object({
@@ -25,6 +27,16 @@ export const publicListInboxResponse = z.object({
   pageCount: z.number(),
 })
 export type PublicListInboxResponse = z.infer<typeof publicListInboxResponse>
+
+export const inboxAIAgentSettingResource = z.object({
+  id: z.string(),
+  aiAgentEnabled: z.boolean(),
+})
+
+export const updateInboxAIAgentSettingRequest = z.object({
+  inboxId: zodBigintAsString(),
+  enabled: z.boolean(),
+})
 
 export const publicListInboxesResponse = z.object({
   data: z.array(
