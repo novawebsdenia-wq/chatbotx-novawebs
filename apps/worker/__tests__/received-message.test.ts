@@ -2393,19 +2393,57 @@ describe("receiveMessage — webhook de mensaje recibido", () => {
     expect(mockEmitMessageReceived).not.toHaveBeenCalled()
   })
 
-  test("un clic en un botón emite con el título del botón", async () => {
+  test.each([
+    [
+      "un clic en un botón",
+      { postbackAction: encodeButtonPayload({ flowId: "42" }) },
+    ],
+    [
+      "una respuesta rápida",
+      { quickReplyAction: encodeButtonPayload({ flowId: "42" }) },
+    ],
+    // A payload the flow engine rejects (another app, a native ice breaker) is still a tap
+    ["un clic con un payload ajeno", { postbackAction: "OTHER_APP_PAYLOAD" }],
+  ])("%s no emite", async (_, action) => {
     mockRunChannelHandler.mockResolvedValue({
       ...incomingDm,
       message: { ...incomingDm.message, text: "Ver precios" },
-      postbackAction: encodeButtonPayload({ flowId: "42" }),
+      ...action,
     })
 
     await receiveMessage({ ...baseProps, integrationType: "instagram" })
 
+    expect(mockEmitMessageReceived).not.toHaveBeenCalled()
+  })
+
+  test("un adjunto sin texto emite con su etiqueta", async () => {
+    mockRunChannelHandler.mockResolvedValue({
+      ...incomingDm,
+      message: {
+        ...incomingDm.message,
+        text: undefined,
+        attachments: [
+          {
+            sourceId: "att-1",
+            fileType: "audio",
+            mimeType: "audio/mp4",
+            originPath: "files/att-1",
+            size: 1,
+          },
+        ],
+      },
+    })
+    mockCreateOrUpdateWithAttachments.mockResolvedValue({
+      result: { ...fakeCreatedMessage, attachments: [] },
+      isNew: true,
+    })
+
+    await receiveMessage({ ...baseProps, integrationType: "messenger" })
+
     expect(mockEmitMessageReceived).toHaveBeenCalledWith(
       "ws-1",
       "contact-1",
-      expect.objectContaining({ text: "Ver precios" }),
+      expect.objectContaining({ text: "[audio]" }),
     )
   })
 

@@ -357,14 +357,17 @@ export const receiveMessage = async (
     if (isNewMessage) {
       createdMessage = newMessage
 
-      // Every new row the contact authored in the DM counts, button taps and
-      // story replies included: they show in the thread like any other
-      // message. Echoes and our own sends are stored as user rows.
+      // Only what the contact typed or sent (story replies and attachments
+      // included). Button taps and quick replies are left out, even ones with a
+      // payload the flow engine rejects: campaigns produce many and the panel's
+      // unread counter is for messages a person may need to answer. Echoes and
+      // our own sends are stored as user rows.
       if (
         MESSAGE_RECEIVED_WEBHOOK_INTEGRATIONS.has(integrationType) &&
         newMessage.messageType === messageTypes.enum.incoming &&
         newMessage.senderType === "contact" &&
-        (incomingMessage.type ?? "message") === "message"
+        (incomingMessage.type ?? "message") === "message" &&
+        !(rawPostbackAction || rawQuickReplyAction)
       ) {
         await emitMessageReceived(inbox.workspaceId, contactInbox.contactId, {
           conversationId: conversation.id,
