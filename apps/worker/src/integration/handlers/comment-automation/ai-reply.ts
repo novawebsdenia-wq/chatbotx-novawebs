@@ -12,6 +12,7 @@ import type {
 } from "@chatbotx.io/database/types"
 import { getLastCommentedPostText } from "@chatbotx.io/variables"
 import type { IntegrationJobCommentAIReply } from "@chatbotx.io/worker-config"
+import { normalizeError } from "universal-error-normalizer"
 import { logger } from "../../../lib/logger"
 import { integrationService } from "../../../services/integrations"
 import { generateAIReplyText } from "../automated-response/replies"
@@ -106,7 +107,10 @@ async function resolvePublicReplyText(props: {
     })
     raw = generated?.text ?? ""
   } catch (err) {
-    logger.warn({ ...logContext, err }, "comment AI reply: generation failed")
+    logger.warn(
+      { ...logContext, error: normalizeError(err) },
+      "comment AI reply: generation failed",
+    )
   }
 
   const check = checkPublicReply(raw)
