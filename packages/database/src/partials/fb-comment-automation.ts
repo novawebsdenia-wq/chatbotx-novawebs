@@ -28,6 +28,9 @@ export type FBCommentPost = z.infer<typeof fbCommentPostSchema>
 export const fbCommentReplySchema = z.object({
   type: z.enum(["AIAgent", "text", "flow", "none"]),
   value: z.string().nullable(),
+  // AIAgent only: posted instead when the agent fails, times out or returns
+  // an unusable reply. Without it the comment is left unanswered.
+  fallbackText: z.string().nullish(),
 })
 export type FBCommentReply = z.infer<typeof fbCommentReplySchema>
 

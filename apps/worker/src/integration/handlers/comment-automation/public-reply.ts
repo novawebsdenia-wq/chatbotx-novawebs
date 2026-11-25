@@ -94,6 +94,7 @@ export async function executePublicReply(
     workspaceId: string
     contactInbox: ContactInboxModel
     message?: string
+    postId?: string
     parentMessageId?: string | null
     parentMessageCreatedAt?: Date | null
   },
@@ -170,9 +171,12 @@ export async function executePublicReply(
           parentMessageId: ctx.parentMessageId ?? null,
           parentMessageCreatedAt:
             ctx.parentMessageCreatedAt?.toISOString() ?? null,
+          postId: ctx.postId,
+          fallbackText: publicReply.fallbackText ?? null,
         },
       },
-      { delay: ctx.delay },
+      // One public AI reply per comment, even if the automation job reruns.
+      { delay: ctx.delay, jobId: `comment-ai-public-${ctx.commentId}` },
     )
   }
 }

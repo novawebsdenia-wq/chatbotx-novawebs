@@ -159,6 +159,8 @@ export type GenerateAIReplyProps = {
   contactInbox: ContactInboxModel
   messages: ModelMessage[]
   aiAgent: AIAgentModel
+  /** Budget for the whole provider-fallback chain; defaults to `aiTimeouts.aiTotal`. */
+  timeoutMs?: number
 }
 
 export type GeneratedAIReply = {
@@ -182,9 +184,10 @@ export async function generateAIReplyText(
 ): Promise<GeneratedAIReply | null> {
   const { conversation, contactInbox, messages, aiAgent } = props
   const providers = aiAgent.models as AIAgentProviderModels
+  const totalMs = props.timeoutMs ?? aiTimeouts.aiTotal
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), aiTimeouts.aiTotal)
+  const timeoutId = setTimeout(() => controller.abort(), totalMs)
 
   try {
     const variables = await contactVariableService.getAll({
@@ -219,9 +222,9 @@ export async function generateAIReplyText(
         toolChoice: "none",
         stopWhen: stepCountIs(1),
         timeout: {
-          totalMs: aiTimeouts.aiTotal,
-          stepMs: aiTimeouts.aiStep,
-          chunkMs: aiTimeouts.aiChunk,
+          totalMs,
+          stepMs: Math.min(aiTimeouts.aiStep, totalMs),
+          chunkMs: Math.min(aiTimeouts.aiChunk, totalMs),
         },
         abortSignal: controller.signal,
       })
