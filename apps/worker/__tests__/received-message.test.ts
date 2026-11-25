@@ -1797,6 +1797,27 @@ describe("contact source taxonomy", () => {
     expect(metaReferralToContactSource()).toBeUndefined()
   })
 
+  test("drops a self-authored comment (our own public reply) before any automation", async () => {
+    await receiveComment({
+      integrationType: "instagram",
+      integrationIdentifier: "17841400000000000",
+      commentData: {
+        commentId: "comment-own-reply",
+        parentId: "comment-1",
+        fromId: "17841400000000000",
+        fromName: "darionahin.ia",
+        message: "¿Qué parte vas a probar primero?",
+        postId: "post-1",
+      },
+    })
+
+    expect(
+      integrationService.identifyInboxAndIntegrationAuthFromIdentifier,
+    ).not.toHaveBeenCalled()
+    expect(mockCreateOrUpdate).not.toHaveBeenCalled()
+    expect(mockIntegrationQueueAdd).not.toHaveBeenCalled()
+  })
+
   test("writes comments as the source for feed comment contacts", async () => {
     await receiveComment({
       integrationType: "messenger",

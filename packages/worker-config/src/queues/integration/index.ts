@@ -561,6 +561,10 @@ export type IntegrationJobCommentAIReply = {
     message?: string
     parentMessageId?: string | null
     parentMessageCreatedAt?: string | null
+    // Public replies only: the commented post, whose caption is given to the
+    // agent as context, and the text posted when the agent gives no usable reply.
+    postId?: string
+    fallbackText?: string | null
   }
 }
 

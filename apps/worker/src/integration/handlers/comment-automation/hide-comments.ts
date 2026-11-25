@@ -20,7 +20,7 @@ const SCHEME_LINK_RE = /https?:\/\/|www\./i
 const BARE_DOMAIN_RE =
   /\b[a-z0-9-]+\.(?:com|net|org|io|vn|shop|store|info|biz)\b/
 
-function hasLink(text: string): boolean {
+export function hasLink(text: string): boolean {
   return SCHEME_LINK_RE.test(text) || BARE_DOMAIN_RE.test(text)
 }
 

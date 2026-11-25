@@ -30,6 +30,7 @@ const {
   mockLoggerWarn,
   mockContactVariableGetAll,
   mockContactVariableReplaceAll,
+  mockGetLastCommentedPostText,
 } = vi.hoisted(() => ({
   mockFindContactInboxBy: vi.fn(),
   mockFindActiveAutomations: vi.fn(),
@@ -56,6 +57,7 @@ const {
   mockLoggerWarn: vi.fn(),
   mockContactVariableGetAll: vi.fn(),
   mockContactVariableReplaceAll: vi.fn(),
+  mockGetLastCommentedPostText: vi.fn(),
 }))
 
 vi.mock("@chatbotx.io/business", () => ({
@@ -103,6 +105,7 @@ vi.mock("@chatbotx.io/variables", () => ({
     getAll: mockContactVariableGetAll,
     replaceAll: mockContactVariableReplaceAll,
   },
+  getLastCommentedPostText: mockGetLastCommentedPostText,
 }))
 
 vi.mock("@chatbotx.io/worker-config", () => ({
@@ -159,9 +162,12 @@ vi.mock("../src/integration/handlers/automated-response/replies", () => ({
 const { isCommentReply, processCommentAutomation } = await import(
   "../src/integration/handlers/comment-automation"
 )
-const { processCommentAIReply } = await import(
-  "../src/integration/handlers/comment-automation/ai-reply"
-)
+const {
+  AI_SKIP_REPLY_TOKEN,
+  checkPublicReply,
+  MAX_PUBLIC_REPLY_CHARS,
+  processCommentAIReply,
+} = await import("../src/integration/handlers/comment-automation/ai-reply")
 
 // ---------------------------------------------------------------------------
 // Fixtures
@@ -179,7 +185,11 @@ type AutomationOverrides = {
   includeKeywords?: { type: string; value: string[] }
   options?: Record<string, boolean>
   post?: { type: string; value: string[]; igIds?: string[] }
-  publicReply?: { type: string; value: string | null }
+  publicReply?: {
+    type: string
+    value: string | null
+    fallbackText?: string | null
+  }
   privateReply?: { type: string; value: string | null }
   hideComments?: Record<string, unknown>
 }
@@ -265,6 +275,7 @@ beforeEach(() => {
   mockIntegrationQueueAdd.mockResolvedValue(undefined)
   mockContactVariableGetAll.mockResolvedValue({})
   mockContactVariableReplaceAll.mockImplementation(({ text }) => text)
+  mockGetLastCommentedPostText.mockResolvedValue(null)
 })
 
 // ---------------------------------------------------------------------------
@@ -521,6 +532,31 @@ describe("processCommentAutomation AIAgent reply", () => {
       "sendFlow",
       expect.anything(),
       expect.anything(),
+    )
+  })
+
+  test("public AIAgent passes the post, the fallback text and a per-comment job id", async () => {
+    mockFindActiveAutomations.mockResolvedValue([
+      buildAutomation({
+        publicReply: {
+          type: "AIAgent",
+          value: "agent-1",
+          fallbackText: "¡Gracias por comentar! 🙌",
+        },
+      }),
+    ])
+
+    await processCommentAutomation(buildJobData() as any)
+
+    expect(mockIntegrationQueueAdd).toHaveBeenCalledWith(
+      "commentAIReply",
+      expect.objectContaining({
+        data: expect.objectContaining({
+          postId: POST_ID,
+          fallbackText: "¡Gracias por comentar! 🙌",
+        }),
+      }),
+      expect.objectContaining({ jobId: `comment-ai-public-${COMMENT_ID}` }),
     )
   })
 
@@ -1044,6 +1080,171 @@ describe("processCommentAIReply", () => {
         },
       }),
     )
+  })
+})
+
+describe("processCommentAIReply public reply guards", () => {
+  const FALLBACK = "¡Gracias por comentar! 🙌"
+
+  beforeEach(() => {
+    mockAiAgentFindBy.mockResolvedValue({ id: "agent-1", prompt: "hi" })
+    mockGenerateAIReplyText.mockResolvedValue({
+      text: "¡Qué bien que te sirva! ¿Qué parte vas a probar primero?",
+      provider: "openrouter",
+      modelId: "openai/gpt-6-luna",
+    })
+  })
+
+  function buildPublicJob(overrides: Partial<Record<string, unknown>> = {}) {
+    return {
+      integrationType: "instagram",
+      integrationIdentifier: "17841400000000000",
+      workspaceId: "workspace-1",
+      conversationId: "conversation-1",
+      contactInboxId: "contact-inbox-1",
+      commentId: COMMENT_ID,
+      agentId: "agent-1",
+      replyChannel: "public" as const,
+      channelType: "instagram" as const,
+      message: "Esto me viene genial para mi tienda",
+      parentMessageId: null,
+      parentMessageCreatedAt: null,
+      postId: POST_ID,
+      fallbackText: FALLBACK,
+      ...overrides,
+    }
+  }
+
+  function postedText(): string | undefined {
+    return mockMessageCreate.mock.calls[0]?.[0]?.text
+  }
+
+  test("success: gives the agent the caption and the comment, with a short timeout, and posts its text", async () => {
+    mockGetLastCommentedPostText.mockResolvedValue("3 automatizaciones")
+
+    await processCommentAIReply(buildPublicJob() as any)
+
+    expect(mockGetLastCommentedPostText).toHaveBeenCalledWith(
+      expect.objectContaining({ id: "contact-inbox-1" }),
+      POST_ID,
+    )
+    const call = mockGenerateAIReplyText.mock.calls[0]?.[0]
+    expect(call.timeoutMs).toBe(15_000)
+    expect(call.messages[0].content).toContain(
+      "<post_caption>\n3 automatizaciones\n</post_caption>",
+    )
+    expect(call.messages[0].content).toContain(
+      "<comment>\nEsto me viene genial para mi tienda\n</comment>",
+    )
+    expect(postedText()).toBe(
+      "¡Qué bien que te sirva! ¿Qué parte vas a probar primero?",
+    )
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ commentId: COMMENT_ID, hasCaption: true }),
+      "comment AI reply: posting AI text",
+    )
+  })
+
+  test("AI failure: posts the fallback text instead and does not throw", async () => {
+    mockGenerateAIReplyText.mockRejectedValue(new Error("provider down"))
+
+    await expect(
+      processCommentAIReply(buildPublicJob() as any),
+    ).resolves.toBeUndefined()
+
+    expect(postedText()).toBe(FALLBACK)
+  })
+
+  test("timeout or empty answer (null): posts the fallback text", async () => {
+    mockGenerateAIReplyText.mockResolvedValue(null)
+
+    await processCommentAIReply(buildPublicJob() as any)
+
+    expect(postedText()).toBe(FALLBACK)
+  })
+
+  test("AI failure without fallback text: leaves the comment unanswered", async () => {
+    mockGenerateAIReplyText.mockRejectedValue(new Error("provider down"))
+
+    await processCommentAIReply(buildPublicJob({ fallbackText: null }) as any)
+
+    expect(mockMessageCreate).not.toHaveBeenCalled()
+    expect(mockChatQueueAdd).not.toHaveBeenCalled()
+  })
+
+  test("text longer than the limit: posts the fallback text, never a cut reply", async () => {
+    mockGenerateAIReplyText.mockResolvedValue({
+      text: "palabra ".repeat(60),
+      provider: "openrouter",
+      modelId: "openai/gpt-6-luna",
+    })
+
+    await processCommentAIReply(buildPublicJob() as any)
+
+    expect(postedText()).toBe(FALLBACK)
+  })
+
+  test("text with a link: posts the fallback text", async () => {
+    mockGenerateAIReplyText.mockResolvedValue({
+      text: "Lo tienes en novawebs.eu ¿lo miras?",
+      provider: "openrouter",
+      modelId: "openai/gpt-6-luna",
+    })
+
+    await processCommentAIReply(buildPublicJob() as any)
+
+    expect(postedText()).toBe(FALLBACK)
+  })
+
+  test("the agent opts out (spam, bare tags): nothing is posted, not even the fallback", async () => {
+    mockGenerateAIReplyText.mockResolvedValue({
+      text: AI_SKIP_REPLY_TOKEN,
+      provider: "openrouter",
+      modelId: "openai/gpt-6-luna",
+    })
+
+    await processCommentAIReply(buildPublicJob() as any)
+
+    expect(mockMessageCreate).not.toHaveBeenCalled()
+  })
+
+  test("caption lookup failure: still answers with the comment alone", async () => {
+    mockGetLastCommentedPostText.mockRejectedValue(new Error("graph down"))
+
+    await processCommentAIReply(buildPublicJob() as any)
+
+    const call = mockGenerateAIReplyText.mock.calls[0]?.[0]
+    expect(call.messages[0].content).not.toContain("<post_caption>")
+    expect(postedText()).toBe(
+      "¡Qué bien que te sirva! ¿Qué parte vas a probar primero?",
+    )
+  })
+})
+
+describe("checkPublicReply", () => {
+  test("strips wrapping quotes and an echoed answer label", () => {
+    expect(checkPublicReply("«¿Y tú qué usas?»")).toEqual({
+      ok: true,
+      text: "¿Y tú qué usas?",
+    })
+    expect(checkPublicReply("Respuesta: «¿Y tú qué usas?»")).toEqual({
+      ok: true,
+      text: "¿Y tú qué usas?",
+    })
+  })
+
+  test("accepts a reply right at the limit and rejects one past it", () => {
+    expect(checkPublicReply("a".repeat(MAX_PUBLIC_REPLY_CHARS)).ok).toBe(true)
+    expect(checkPublicReply("a".repeat(MAX_PUBLIC_REPLY_CHARS + 1))).toEqual({
+      ok: false,
+      reason: "too long",
+    })
+  })
+
+  test("rejects blank text and links with or without scheme", () => {
+    expect(checkPublicReply("   ")).toEqual({ ok: false, reason: "empty" })
+    expect(checkPublicReply("Mira https://x.com/a").ok).toBe(false)
+    expect(checkPublicReply("Entra en ejemplo.es").ok).toBe(false)
   })
 })
 

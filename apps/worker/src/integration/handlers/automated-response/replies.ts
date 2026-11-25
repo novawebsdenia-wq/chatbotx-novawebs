@@ -159,6 +159,8 @@ export type GenerateAIReplyProps = {
   contactInbox: ContactInboxModel
   messages: ModelMessage[]
   aiAgent: AIAgentModel
+  /** Budget for the whole provider-fallback chain; defaults to `aiTimeouts.aiTotal`. */
+  timeoutMs?: number
 }
 
 export type GeneratedAIReply = {
@@ -166,6 +168,13 @@ export type GeneratedAIReply = {
   provider: ReplyAIProvider
   modelId: string
 }
+
+const CUT_OFF_FINISH_REASONS: ReadonlySet<string> = new Set([
+  "abort",
+  "length",
+  "content-filter",
+  "error",
+])
 
 /**
  * Generate an AI agent reply as plain text WITHOUT sending it anywhere.
@@ -182,9 +191,10 @@ export async function generateAIReplyText(
 ): Promise<GeneratedAIReply | null> {
   const { conversation, contactInbox, messages, aiAgent } = props
   const providers = aiAgent.models as AIAgentProviderModels
+  const totalMs = props.timeoutMs ?? aiTimeouts.aiTotal
 
   const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), aiTimeouts.aiTotal)
+  const timeoutId = setTimeout(() => controller.abort(), totalMs)
 
   try {
     const variables = await contactVariableService.getAll({
@@ -209,6 +219,7 @@ export async function generateAIReplyText(
       }
       const provider = getProviderName(providerInfo)
 
+      let aborted = false
       const result = await streamText({
         model: modelConfig.model,
         system: systemPrompt,
@@ -219,11 +230,14 @@ export async function generateAIReplyText(
         toolChoice: "none",
         stopWhen: stepCountIs(1),
         timeout: {
-          totalMs: aiTimeouts.aiTotal,
-          stepMs: aiTimeouts.aiStep,
-          chunkMs: aiTimeouts.aiChunk,
+          totalMs,
+          stepMs: Math.min(aiTimeouts.aiStep, totalMs),
+          chunkMs: Math.min(aiTimeouts.aiChunk, totalMs),
         },
         abortSignal: controller.signal,
+        onAbort: () => {
+          aborted = true
+        },
       })
 
       const { fullText } = await processStreamingText(
@@ -246,12 +260,30 @@ export async function generateAIReplyText(
       })
 
       const text = fullText.trim()
-      if (text) {
-        return {
-          text,
-          provider,
-          modelId: providerInfo.model,
-        }
+      if (!text) {
+        continue
+      }
+      // A timeout or the token cap ends the stream without an error, leaving
+      // half a reply: never hand that back as if it were complete.
+      const finishReason = aborted
+        ? "abort"
+        : await Promise.resolve(result.finishReason).catch(() => "error")
+      if (CUT_OFF_FINISH_REASONS.has(finishReason)) {
+        logger.warn(
+          {
+            provider,
+            modelId: providerInfo.model,
+            conversationId: conversation.id,
+            finishReason,
+          },
+          "[comment-ai-reply] discarded a cut-off reply",
+        )
+        continue
+      }
+      return {
+        text,
+        provider,
+        modelId: providerInfo.model,
       }
     }
 

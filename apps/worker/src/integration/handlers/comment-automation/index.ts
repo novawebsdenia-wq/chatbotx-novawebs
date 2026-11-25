@@ -327,6 +327,7 @@ export async function processCommentAutomation(
           workspaceId,
           contactInbox,
           message,
+          postId,
           parentMessageId,
           parentMessageCreatedAt,
         })
