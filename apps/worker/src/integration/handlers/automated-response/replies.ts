@@ -169,6 +169,13 @@ export type GeneratedAIReply = {
   modelId: string
 }
 
+const CUT_OFF_FINISH_REASONS: ReadonlySet<string> = new Set([
+  "abort",
+  "length",
+  "content-filter",
+  "error",
+])
+
 /**
  * Generate an AI agent reply as plain text WITHOUT sending it anywhere.
  *
@@ -212,6 +219,7 @@ export async function generateAIReplyText(
       }
       const provider = getProviderName(providerInfo)
 
+      let aborted = false
       const result = await streamText({
         model: modelConfig.model,
         system: systemPrompt,
@@ -227,6 +235,9 @@ export async function generateAIReplyText(
           chunkMs: Math.min(aiTimeouts.aiChunk, totalMs),
         },
         abortSignal: controller.signal,
+        onAbort: () => {
+          aborted = true
+        },
       })
 
       const { fullText } = await processStreamingText(
@@ -249,12 +260,30 @@ export async function generateAIReplyText(
       })
 
       const text = fullText.trim()
-      if (text) {
-        return {
-          text,
-          provider,
-          modelId: providerInfo.model,
-        }
+      if (!text) {
+        continue
+      }
+      // A timeout or the token cap ends the stream without an error, leaving
+      // half a reply: never hand that back as if it were complete.
+      const finishReason = aborted
+        ? "abort"
+        : await Promise.resolve(result.finishReason).catch(() => "error")
+      if (CUT_OFF_FINISH_REASONS.has(finishReason)) {
+        logger.warn(
+          {
+            provider,
+            modelId: providerInfo.model,
+            conversationId: conversation.id,
+            finishReason,
+          },
+          "[comment-ai-reply] discarded a cut-off reply",
+        )
+        continue
+      }
+      return {
+        text,
+        provider,
+        modelId: providerInfo.model,
       }
     }
 
