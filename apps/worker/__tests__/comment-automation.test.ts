@@ -1139,6 +1139,10 @@ describe("processCommentAIReply public reply guards", () => {
     expect(postedText()).toBe(
       "¡Qué bien que te sirva! ¿Qué parte vas a probar primero?",
     )
+    expect(mockLoggerInfo).toHaveBeenCalledWith(
+      expect.objectContaining({ commentId: COMMENT_ID, hasCaption: true }),
+      "comment AI reply: posting AI text",
+    )
   })
 
   test("AI failure: posts the fallback text instead and does not throw", async () => {

@@ -78,17 +78,17 @@ async function resolvePublicReplyText(props: {
   contactInbox: ContactInboxModel
 }): Promise<string | null> {
   const { data } = props
-  const logContext = {
-    agentId: data.agentId,
-    commentId: data.commentId,
-    workspaceId: data.workspaceId,
-  }
-
   const caption = data.postId
     ? await getLastCommentedPostText(props.contactInbox, data.postId).catch(
         () => null,
       )
     : null
+  const logContext = {
+    agentId: data.agentId,
+    commentId: data.commentId,
+    workspaceId: data.workspaceId,
+    hasCaption: Boolean(caption),
+  }
 
   let raw = ""
   try {
@@ -111,6 +111,10 @@ async function resolvePublicReplyText(props: {
 
   const check = checkPublicReply(raw)
   if (check.ok) {
+    logger.info(
+      { ...logContext, chars: check.text.length },
+      "comment AI reply: posting AI text",
+    )
     return check.text
   }
   if (check.reason === "skip") {
